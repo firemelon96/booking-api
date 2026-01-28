@@ -26,6 +26,7 @@ model Tour {
   name    String
   slug    String        @unique
   pricing TourPricing[]
+  bookings Booking[]
 }
 
 model TourPricing {
@@ -36,7 +37,7 @@ model TourPricing {
   price        Int
   isGroupPrice Boolean  @default(false)
   tourId       String
-  tour         Tour     @relation(fields: [tourId], references: [id])
+  tour         Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
 }
 
 model Booking {
@@ -47,8 +48,13 @@ model Booking {
   startDate DateTime
   endDate   DateTime?
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  tour Tour @relation(fields: [tourId], references: [id], onDelete: Restrict)
 
+  createdAt DateTime @default(now())
+
+  @@index([tourId, startDate])
+  @@index([userId, createdAt])
 }
 
 enum PricingType {
