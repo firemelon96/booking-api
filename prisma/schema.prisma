@@ -25,6 +25,9 @@ model Tour {
   id      String        @id @default(uuid())
   name    String
   slug    String        @unique
+
+  joinerCapacity Int @default(12)
+
   pricing TourPricing[]
   bookings Booking[]
 }
@@ -44,6 +47,10 @@ model Booking {
   id        String   @id @default(uuid())
   userId    String
   tourId    String
+
+  pricingType PricingType
+  participants Int
+
   total     Int
   startDate DateTime
   endDate   DateTime?
@@ -54,6 +61,7 @@ model Booking {
   createdAt DateTime @default(now())
 
   @@index([tourId, startDate])
+  @@index([tourId, pricingType, startDate])
   @@index([userId, createdAt])
 }
 

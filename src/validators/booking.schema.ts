@@ -17,4 +17,14 @@ export const createBookingSchema = z
       message: 'End date must be Greater than the start date',
       path: ['endDate'],
     },
+  )
+  .refine(
+    (d) => {
+      if (d.pricingType === 'joiner') return !d.endDate;
+      return true;
+    },
+    {
+      message: 'Joiner bookings must be single-day (no end date).',
+      path: ['endDate'],
+    },
   );

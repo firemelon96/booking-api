@@ -8,7 +8,7 @@ export async function create(req: Request, res: Response) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const body = createBookingSchema.parse(req.body.body);
+    const body = createBookingSchema.parse(req.body);
 
     const booking = await createBooking({
       userId: req.user.userId,

@@ -9,6 +9,7 @@ import {
 import { authenticate } from '../middlewares/auth.middleware';
 import { requireAdmin } from '../middlewares/role.middleware';
 import tourPricingRoutes from './tourPricing.routes';
+import availabilityRoutes from './availability.routes';
 
 const router = Router();
 
@@ -19,5 +20,7 @@ router.patch('/:id', authenticate, requireAdmin, update);
 router.delete('/:id', authenticate, requireAdmin, remove);
 
 router.use('/:tourId/pricing', tourPricingRoutes);
+
+router.use('/:tourId/availability', availabilityRoutes);
 
 export default router;

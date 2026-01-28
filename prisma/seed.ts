@@ -76,6 +76,8 @@ async function main() {
       tourId: tour.id,
       total: 5000,
       startDate: new Date('2026-02-01'),
+      pricingType: 'joiner',
+      participants: 3,
     },
   });
 
