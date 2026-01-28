@@ -1,0 +1,63 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id       String   @id @default(uuid())
+  email    String   @unique
+  password String
+  role     Role     @default(USER)
+  bookings Booking[]
+}
+
+model Tour {
+  id      String        @id @default(uuid())
+  name    String
+  slug    String        @unique
+  pricing TourPricing[]
+}
+
+model TourPricing {
+  id           String   @id @default(uuid())
+  pricingType  PricingType
+  minGroupSize Int
+  maxGroupSize Int
+  price        Int
+  isGroupPrice Boolean  @default(false)
+  tourId       String
+  tour         Tour     @relation(fields: [tourId], references: [id])
+}
+
+model Booking {
+  id        String   @id @default(uuid())
+  userId    String
+  tourId    String
+  total     Int
+  startDate DateTime
+  endDate   DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+}
+
+enum PricingType {
+  joiner
+  private
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
