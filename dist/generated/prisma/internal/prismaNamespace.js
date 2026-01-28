@@ -126,7 +126,8 @@ exports.UserScalarFieldEnum = {
 exports.TourScalarFieldEnum = {
     id: 'id',
     name: 'name',
-    slug: 'slug'
+    slug: 'slug',
+    joinerCapacity: 'joinerCapacity'
 };
 exports.TourPricingScalarFieldEnum = {
     id: 'id',
@@ -141,9 +142,12 @@ exports.BookingScalarFieldEnum = {
     id: 'id',
     userId: 'userId',
     tourId: 'tourId',
+    pricingType: 'pricingType',
+    participants: 'participants',
     total: 'total',
     startDate: 'startDate',
-    endDate: 'endDate'
+    endDate: 'endDate',
+    createdAt: 'createdAt'
 };
 exports.SortOrder = {
     asc: 'asc',
