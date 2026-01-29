@@ -1,4 +1,12 @@
+import path from 'path';
 import swaggerJSDoc from 'swagger-jsdoc';
+
+const isProd = process.env.NODE_ENV === 'production';
+
+// __dirname here is inside dist/config in production, and src/config in dev.
+const apisGlob = isProd
+  ? path.join(__dirname, '../routes/**/*.js') // dist/routes/**/*.js
+  : path.join(__dirname, '../routes/**/*.ts'); // src/routes/**/*.ts (if running ts-node)
 
 export const swaggerSpec = swaggerJSDoc({
   definition: {
@@ -34,5 +42,5 @@ export const swaggerSpec = swaggerJSDoc({
       },
     ],
   },
-  apis: ['./src/routes/**/*.ts'], // scan route files
+  apis: [apisGlob], // scan route files
 });

@@ -13,5 +13,7 @@ COPY prisma ./prisma
 
 COPY dist ./dist
 
+COPY public ./public
+
 EXPOSE 4000
 CMD ["sh", "-c", "echo DB=$([ -n \"$DATABASE_URL\" ] && echo YES || echo NO) && npx prisma migrate deploy && node dist/server.js"]
