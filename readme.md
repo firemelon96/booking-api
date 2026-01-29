@@ -1,5 +1,9 @@
 # Booking API (Tours • Pricing • Availability • Bookings)
 
+## 🔗 Links
+
+- **API Base URL:** https://api.palawanwebsolutions.com  
+
 A production-style **Booking API** built with **TypeScript + Express + Prisma + PostgreSQL** and designed for a travel/tour booking workflow:
 
 - **JWT Authentication** + **Role-based access (ADMIN / USER)**
