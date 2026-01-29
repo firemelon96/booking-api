@@ -10,7 +10,6 @@ RUN npm install --omit=dev
 COPY prisma.config.ts ./prisma.config.ts
 
 COPY prisma ./prisma
-RUN npx prisma generate
 
 COPY dist ./dist
 
