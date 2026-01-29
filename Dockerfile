@@ -12,4 +12,4 @@ RUN npx prisma generate
 COPY dist ./dist
 
 EXPOSE 4000
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
+CMD ["sh", "-c", "echo DB=$([ -n \"$DATABASE_URL\" ] && echo YES || echo NO) && npx prisma migrate deploy && node dist/server.js"]
