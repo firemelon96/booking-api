@@ -10,6 +10,7 @@ const tour_routes_1 = __importDefault(require("./routes/tour.routes"));
 const pricing_routes_1 = __importDefault(require("./routes/pricing.routes"));
 const booking_routes_1 = __importDefault(require("./routes/booking.routes"));
 const app = (0, express_1.default)();
+app.set('trust proxy', 1);
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
 app.get('/', (_req, res) => {
