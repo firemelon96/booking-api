@@ -37,6 +37,53 @@ const express_1 = require("express");
 const auth_middleware_1 = require("../middlewares/auth.middleware");
 const ctrl = __importStar(require("../controllers/booking.controller"));
 const router = (0, express_1.Router)();
+/**
+ * @swagger
+ * /api/bookings:
+ *   post:
+ *     summary: Create a booking
+ *     tags: [Bookings]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [tourId, pricingType, participants, startDate]
+ *             properties:
+ *               tourId:
+ *                 type: string
+ *               pricingType:
+ *                 type: string
+ *                 enum: [joiner, private]
+ *               participants:
+ *                 type: number
+ *               startDate:
+ *                 type: string
+ *                 format: date-time
+ *               endDate:
+ *                 type: string
+ *                 format: date-time
+ *     responses:
+ *       201:
+ *         description: Booking created
+ *       400:
+ *         description: Booking conflict or validation error
+ */
+/**
+ * @swagger
+ * /api/bookings/me:
+ *   get:
+ *     summary: Get logged-in user's bookings
+ *     tags: [Bookings]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of bookings
+ */
 router.post('/', auth_middleware_1.authenticate, ctrl.create);
 router.get('/me', auth_middleware_1.authenticate, ctrl.me);
 exports.default = router;
