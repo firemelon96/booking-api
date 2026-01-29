@@ -11,6 +11,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.use('/', (_req, res) => {
+  res.send('Booking API is running 🚀 ');
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/tours', tourRoutes);
 app.use('/api/pricing', pricingRoutes);
