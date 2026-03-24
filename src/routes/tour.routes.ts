@@ -10,6 +10,7 @@ import { authenticate } from '../middlewares/auth.middleware';
 import { requireAdmin } from '../middlewares/role.middleware';
 import tourPricingRoutes from './tourPricing.routes';
 import availabilityRoutes from './availability.routes';
+import imageRoutes from './image.routes';
 
 /**
  * @swagger
@@ -76,6 +77,8 @@ router.patch('/:id', authenticate, requireAdmin, update);
 router.delete('/:id', authenticate, requireAdmin, remove);
 
 router.use('/:tourId/pricing', tourPricingRoutes);
+
+router.use('/:tourId/featured', imageRoutes);
 
 router.use('/:tourId/availability', availabilityRoutes);
 

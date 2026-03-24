@@ -7,6 +7,7 @@ import {
   listTours,
   updateTour,
 } from '../services/tour.service';
+import cloudinary from '../config/cloudinary';
 
 export async function list(req: Request, res: Response) {
   try {
@@ -37,6 +38,12 @@ export async function create(req: Request, res: Response) {
     const tour = await createTour(data);
     res.status(201).json(tour);
   } catch (err: any) {
+    if (req.body.images) {
+      for (const img of req.body.images) {
+        await cloudinary.uploader.destroy(img.public_id);
+      }
+    }
+
     res.status(400).json({ error: err.message });
   }
 }

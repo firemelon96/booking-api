@@ -30,7 +30,7 @@ export async function create(req: Request, res: Response) {
   }
 }
 
-export async function me(req: Request, res: Response) {
+export async function myBookings(req: Request, res: Response) {
   try {
     if (!req.user?.userId) {
       return res.status(401).json({ error: 'Unauthorized' });

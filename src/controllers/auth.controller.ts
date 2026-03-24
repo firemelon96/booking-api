@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import { loginSchema, registerSchema } from '../validators/auth.schema';
 import { loginUser, registerUser } from '../services/auth.service';
-import { email } from 'zod';
 
 export async function register(req: Request, res: Response) {
   try {

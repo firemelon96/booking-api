@@ -53,7 +53,7 @@ const router = Router();
  *         description: List of bookings
  */
 
-router.post('/', authenticate, ctrl.create);
-router.get('/me', authenticate, ctrl.me);
+router.post('/create', authenticate, ctrl.create);
+router.get('/', authenticate, ctrl.myBookings);
 
 export default router;

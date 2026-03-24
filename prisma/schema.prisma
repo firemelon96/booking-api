@@ -27,11 +27,30 @@ model Tour {
   id      String        @id @default(uuid())
   name    String
   slug    String        @unique
-
   joinerCapacity Int @default(12)
-
+  images  Image[]
   pricing TourPricing[]
   bookings Booking[]
+  itineraries Itinerary[]
+}
+
+model Itinerary {
+  id      String      @id @default(uuid())
+  activities  String[]
+  destinations  String[]
+  images  String[]
+  tourId  String
+  tour    Tour        @relation(fields: [tourId], references: [id], onDelete: Cascade)
+}
+
+model Image {
+  id          String      @id @default(uuid())
+  url         String
+  publicId    String
+  isFeatured  Boolean     @default(false)
+  tourId      String?
+  tour        Tour?       @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  createdAt   DateTime    @default(now())
 }
 
 model TourPricing {
