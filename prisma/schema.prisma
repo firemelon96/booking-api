@@ -20,6 +20,7 @@ model User {
   googleId String?  @unique
   name    String?
   role     Role     @default(USER)
+
   bookings Booking[]
 }
 
@@ -36,19 +37,24 @@ model Tour {
 
 model Itinerary {
   id      String      @id @default(uuid())
+  title   String
   activities  String[]
   destinations  String[]
-  images  String[]
+
   tourId  String
   tour    Tour        @relation(fields: [tourId], references: [id], onDelete: Cascade)
 }
+
 
 model Image {
   id          String      @id @default(uuid())
   url         String
   publicId    String
   isFeatured  Boolean     @default(false)
+
+
   tourId      String?
+
   tour        Tour?       @relation(fields: [tourId], references: [id], onDelete: Cascade)
   createdAt   DateTime    @default(now())
 }

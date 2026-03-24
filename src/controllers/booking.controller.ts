@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { createBookingSchema } from '../validators/booking.schema';
-import { createBooking, listMyBookings } from '../services/boooking.service';
+import { createBooking, listMyBookings } from '../services/booking.service';
 
 export async function create(req: Request, res: Response) {
   try {

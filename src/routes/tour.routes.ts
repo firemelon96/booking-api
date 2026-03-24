@@ -11,7 +11,7 @@ import { requireAdmin } from '../middlewares/role.middleware';
 import tourPricingRoutes from './tourPricing.routes';
 import availabilityRoutes from './availability.routes';
 import imageRoutes from './image.routes';
-
+import itineraryRoutes from './itinerary.routes';
 /**
  * @swagger
  * /api/tours:
@@ -81,5 +81,7 @@ router.use('/:tourId/pricing', tourPricingRoutes);
 router.use('/:tourId/featured', imageRoutes);
 
 router.use('/:tourId/availability', availabilityRoutes);
+
+router.use('/:tourId/itinerary', itineraryRoutes);
 
 export default router;

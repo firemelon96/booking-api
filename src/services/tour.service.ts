@@ -8,7 +8,7 @@ import { ImageType } from '../validators/image.schema';
 export async function listTours() {
   return prisma.tour.findMany({
     orderBy: [{ name: 'asc' }],
-    include: { pricing: true },
+    include: { pricing: true, images: true, itineraries: true },
   });
 }
 
