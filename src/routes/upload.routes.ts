@@ -7,13 +7,15 @@ import { upload } from '../middlewares/upload.middleware';
 const router = Router();
 
 router.post(
-  '/upload',
+  '/',
   authenticate,
   requireAdmin,
   upload.array('images', 5),
   uploadImage,
 );
 
-router.delete('/upload', authenticate, requireAdmin, deleteMultiple);
+router.delete('/', authenticate, requireAdmin, deleteMultiple);
+
+// router.get('/', authenticate, requireAdmin, listImage)
 
 export default router;

@@ -23,3 +23,9 @@ export async function updateUserRole(id: string, role: Role) {
 export async function getAllUsers(id: string) {
   return await prisma.user.findMany({ where: { NOT: { id } } });
 }
+
+export async function setProfileImage(userId: string, ImageId: string) {
+  const existing = await prisma.image.findFirst({
+    where: {},
+  });
+}

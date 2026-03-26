@@ -3,7 +3,6 @@ import { prisma } from '../config/prisma';
 import { Image } from '../generated/prisma/browser';
 
 import { slugify } from '../utils/slugify';
-import { ImageType } from '../validators/image.schema';
 
 export async function listTours() {
   return prisma.tour.findMany({
@@ -27,7 +26,7 @@ export async function getTourBySlug(slug: string) {
 export async function createTour(input: {
   name: string;
   slug?: string;
-  images: ImageType[];
+  imageIds: string[];
 }) {
   const slug = input.slug ? input.slug : slugify(input.name);
 
@@ -37,19 +36,25 @@ export async function createTour(input: {
     throw new Error('Slug already exists');
   }
 
-  return prisma.tour.create({
+  const tour = await prisma.tour.create({
     data: {
       name: input.name,
       slug,
-      images: {
-        create: input.images.map((img) => ({
-          url: img.url,
-          publicId: img.public_Id,
-        })),
-      },
     },
-    include: { images: true },
   });
+
+  await prisma.image.updateMany({
+    where: {
+      id: { in: input.imageIds },
+    },
+    data: {
+      tourId: tour.id,
+      status: 'ACTIVE',
+      type: 'TOUR',
+    },
+  });
+
+  return tour;
 }
 
 export async function updateTour(
@@ -57,8 +62,8 @@ export async function updateTour(
   input: {
     name: string;
     slug?: string;
-    images: ImageType[];
-    existingImages: ImageType[];
+    existingImageIds: string[];
+    newImageIds: string[];
   },
 ) {
   const existingTour = await prisma.tour.findUnique({ where: { id } });
@@ -75,52 +80,77 @@ export async function updateTour(
   }
 
   //get current images
-  const current = await prisma.image.findMany({ where: { tourId: id } });
+  const currentImages = await prisma.image.findMany({ where: { tourId: id } });
 
-  const existingIds = input.existingImages.map((img) => img.id);
+  const currentIds = currentImages.map((img) => img.id);
 
   //find images to delete
-  const toDelete = current.filter((img) => !existingIds.includes(img.id));
+  const toDeleteIds = currentIds.filter(
+    (id) => !input.existingImageIds.includes(id),
+  );
+
+  const toDeleteImages = currentImages.filter((img) =>
+    toDeleteIds.includes(img.id),
+  );
 
   //Delete from cloudinary
   await Promise.all(
-    toDelete.map((img) => cloudinary.uploader.destroy(img.publicId)),
+    toDeleteImages.map((img) => cloudinary.uploader.destroy(img.publicId)),
   );
 
   //delete from the db
   await prisma.image.deleteMany({
     where: {
       id: {
-        in: toDelete.map((img) => img.id),
+        in: toDeleteIds,
       },
     },
   });
 
-  //add the new images
-  const newImages = input.images.map((img) => ({
-    url: img.url,
-    publicId: img.public_Id,
-    tourId: id,
-  }));
-
-  await prisma.image.createMany({
-    data: newImages,
+  //assign the new images
+  await prisma.image.updateMany({
+    where: { id: { in: input.newImageIds } },
+    data: {
+      tourId: id,
+      status: 'ACTIVE',
+      type: 'TOUR',
+    },
   });
 
   //update tours
-  return prisma.tour.update({
-    where: { id },
-    data: {
-      name: input.name ?? undefined,
-      slug: nextSlug ?? undefined,
-    },
-  });
+
+  try {
+    return prisma.tour.update({
+      where: { id },
+      data: {
+        name: input.name ?? undefined,
+        slug: nextSlug ?? undefined,
+      },
+      include: { images: true },
+    });
+  } catch (error) {
+    await prisma.image.deleteMany({
+      where: {
+        id: { in: input.newImageIds },
+        status: 'TEMP',
+      },
+    });
+  }
 }
 
 export async function deleteTour(id: string) {
-  const existing = await prisma.tour.findUnique({ where: { id } });
+  const existing = await prisma.tour.findUnique({
+    where: { id },
+    include: { images: true },
+  });
 
   if (!existing) throw new Error('Tour not found!');
+
+  const deletePromises = existing.images.map((img) =>
+    cloudinary.uploader.destroy(img.publicId),
+  );
+
+  await Promise.all(deletePromises);
 
   return prisma.tour.delete({ where: { id } });
 }

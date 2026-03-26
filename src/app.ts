@@ -31,7 +31,7 @@ app.use('/api/pricing', pricingRoutes);
 
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api', uploadRoutes);
+app.use('/api/upload', uploadRoutes);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));

@@ -22,6 +22,7 @@ model User {
   role     Role     @default(USER)
 
   bookings Booking[]
+  image     Image[]
 }
 
 model Tour {
@@ -52,10 +53,14 @@ model Image {
   publicId    String
   isFeatured  Boolean     @default(false)
 
+  type        ImageType
+  status      ImageStatus @default(TEMP) //for cleanup
 
   tourId      String?
+  userId      String?
 
   tour        Tour?       @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  user        User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime    @default(now())
 }
 
@@ -100,5 +105,16 @@ enum PricingType {
 enum Role {
   USER
   ADMIN
+}
+
+enum ImageType {
+  TOUR
+  ITINERARY
+  PROFILE
+}
+
+enum ImageStatus {
+  TEMP
+  ACTIVE
 }
 

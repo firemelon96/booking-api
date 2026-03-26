@@ -63,6 +63,7 @@ export async function update(req: Request, res: Response) {
     res.json(tour);
   } catch (err: any) {
     const msg = err.message || 'Error';
+
     res.status(msg.includes('not found') ? 404 : 400).json({ error: msg });
   }
 }

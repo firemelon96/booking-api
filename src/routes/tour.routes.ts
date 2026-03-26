@@ -12,6 +12,7 @@ import tourPricingRoutes from './tourPricing.routes';
 import availabilityRoutes from './availability.routes';
 import imageRoutes from './image.routes';
 import itineraryRoutes from './itinerary.routes';
+import uploadRoutes from './upload.routes';
 /**
  * @swagger
  * /api/tours:
