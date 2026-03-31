@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
-import { error } from 'node:console';
 
 interface JwtPayLoad {
   userId: string;

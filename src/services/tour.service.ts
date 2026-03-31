@@ -1,8 +1,96 @@
+import z from 'zod';
 import cloudinary from '../config/cloudinary';
 import { prisma } from '../config/prisma';
-import { Image } from '../generated/prisma/browser';
+import { Image, PricingType } from '../generated/prisma/browser';
+import groupBy from 'lodash.groupby';
 
 import { slugify } from '../utils/slugify';
+import { createFullTourSchema } from '../validators/tour.schema';
+import { createTourPricingSchema } from '../validators/tourPricing.schema';
+
+function rangesOverlap(aMin: number, aMax: number, bMin: number, bMax: number) {
+  return Math.max(aMin, bMin) <= Math.min(aMax, bMax);
+}
+
+async function assertNoOverlap(data: {
+  tourId: string;
+  pricingType: PricingType;
+  minGroupSize: number;
+  maxGroupSize: number;
+}) {
+  const existing = await prisma.tourPricing.findMany({
+    where: {
+      tourId: data.tourId,
+      pricingType: data.pricingType,
+    },
+    select: { id: true, minGroupSize: true, maxGroupSize: true },
+  });
+
+  const conflict = existing.find((p) =>
+    rangesOverlap(
+      data.minGroupSize,
+      data.maxGroupSize,
+      p.minGroupSize,
+      p.maxGroupSize,
+    ),
+  );
+
+  if (conflict) {
+    throw new Error(
+      `Pricing range overlaps with the existing range ${conflict.minGroupSize}-${conflict.maxGroupSize}`,
+    );
+  }
+}
+
+function validateNoOverlap(pricing: z.infer<typeof createTourPricingSchema>[]) {
+  if (!pricing.length) {
+    throw new Error('Pricing is required');
+  }
+
+  const grouped = groupBy(pricing, 'pricingType');
+
+  for (const [type, ranges] of Object.entries(grouped)) {
+    const sorted = [...ranges].sort((a, b) => a.minGroupSize - b.minGroupSize);
+
+    if (sorted[0].minGroupSize !== 1) {
+      throw new Error(`${type} pricing must start from group size 1`);
+    }
+
+    for (let i = 0; i < sorted.length; i++) {
+      const current = sorted[i];
+
+      //invalid range
+      if (current.minGroupSize > current.maxGroupSize) {
+        throw new Error(
+          `${type}: Invalid range ${current.minGroupSize}=${current.maxGroupSize}`,
+        );
+      }
+
+      //invalid price
+      if (current.price <= 0) {
+        throw new Error(`${type}: Price must be greater than 0`);
+      }
+
+      if (i === 0) continue;
+
+      const prev = sorted[i - 1];
+
+      //overlap
+      if (current.minGroupSize <= prev.maxGroupSize) {
+        throw new Error(
+          `${type}: Overlap between ${prev.minGroupSize}-${prev.maxGroupSize} and ${current.minGroupSize}-${current.maxGroupSize}`,
+        );
+      }
+
+      //gap
+      if (current.minGroupSize !== prev.maxGroupSize + 1) {
+        throw new Error(
+          `${type}: Gap between ${prev.maxGroupSize} and ${current.minGroupSize}`,
+        );
+      }
+    }
+  }
+}
 
 export async function listTours() {
   return prisma.tour.findMany({
@@ -23,39 +111,39 @@ export async function getTourBySlug(slug: string) {
   return tour;
 }
 
-export async function createTour(input: {
-  name: string;
-  slug?: string;
-  imageIds: string[];
-}) {
-  const slug = input.slug ? input.slug : slugify(input.name);
+// export async function createTour(input: {
+//   name: string;
+//   slug?: string;
+//   imageIds: string[];
+// }) {
+//   const slug = input.slug ? input.slug : slugify(input.name);
 
-  const exists = await prisma.tour.findUnique({ where: { slug } });
+//   const exists = await prisma.tour.findUnique({ where: { slug } });
 
-  if (exists) {
-    throw new Error('Slug already exists');
-  }
+//   if (exists) {
+//     throw new Error('Slug already exists');
+//   }
 
-  const tour = await prisma.tour.create({
-    data: {
-      name: input.name,
-      slug,
-    },
-  });
+//   const tour = await prisma.tour.create({
+//     data: {
+//       name: input.name,
+//       slug,
+//     },
+//   });
 
-  await prisma.image.updateMany({
-    where: {
-      id: { in: input.imageIds },
-    },
-    data: {
-      tourId: tour.id,
-      status: 'ACTIVE',
-      type: 'TOUR',
-    },
-  });
+//   await prisma.image.updateMany({
+//     where: {
+//       id: { in: input.imageIds },
+//     },
+//     data: {
+//       tourId: tour.id,
+//       status: 'ACTIVE',
+//       type: 'TOUR',
+//     },
+//   });
 
-  return tour;
-}
+//   return tour;
+// }
 
 export async function updateTour(
   id: string,
@@ -136,6 +224,78 @@ export async function updateTour(
       },
     });
   }
+}
+
+export async function createFullTourService(
+  data: z.infer<typeof createFullTourSchema>,
+) {
+  const {
+    name,
+    // description,
+    // address,
+    // exclusions,
+    // inclusions,
+    imageIds,
+    itineraries,
+    pricing,
+  } = data;
+
+  const slug = slugify(name);
+
+  const exists = await prisma.tour.findUnique({ where: { slug } });
+
+  if (exists) {
+    throw new Error('Tour already exists');
+  }
+
+  validateNoOverlap(pricing);
+
+  return prisma.$transaction(async (tx) => {
+    //create tour
+    const tour = await tx.tour.create({
+      data: {
+        name,
+        slug,
+        // description,
+        // address,
+        // exclusions,
+        // inclusions,
+      },
+    });
+
+    //create itineraries
+    if (itineraries?.length) {
+      await tx.itinerary.createMany({
+        data: itineraries.map((item) => ({
+          ...item,
+          tourId: tour.id,
+        })),
+      });
+    }
+
+    //Create pricing
+
+    await tx.tourPricing.createMany({
+      data: pricing.map((p) => ({
+        ...p,
+        tourId: tour.id,
+      })),
+    });
+
+    //assign imageIds
+    if (imageIds.length) {
+      await tx.image.updateMany({
+        where: { id: { in: imageIds } },
+        data: {
+          tourId: tour.id,
+          status: 'ACTIVE',
+          type: 'TOUR',
+        },
+      });
+    }
+
+    return tour;
+  });
 }
 
 export async function deleteTour(id: string) {

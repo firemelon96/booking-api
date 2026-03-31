@@ -6,13 +6,7 @@ import { upload } from '../middlewares/upload.middleware';
 
 const router = Router();
 
-router.post(
-  '/',
-  authenticate,
-  requireAdmin,
-  upload.array('images', 5),
-  uploadImage,
-);
+router.post('/', authenticate, upload.array('images', 5), uploadImage);
 
 router.delete('/', authenticate, requireAdmin, deleteMultiple);
 

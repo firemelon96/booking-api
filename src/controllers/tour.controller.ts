@@ -1,6 +1,11 @@
 import { Request, Response } from 'express';
-import { createTourSchema, updateTourSchema } from '../validators/tour.schema';
 import {
+  createFullTourSchema,
+  createTourSchema,
+  updateTourSchema,
+} from '../validators/tour.schema';
+import {
+  createFullTourService,
   createTour,
   deleteTour,
   getTourBySlug,
@@ -29,6 +34,22 @@ export async function getBySlug(req: Request, res: Response) {
     res.json(tour);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
+  }
+}
+
+export async function createFullTour(req: Request, res: Response) {
+  try {
+    const data = createFullTourSchema.parse(req.body);
+
+    if (!data) {
+      throw new Error('Invalid fields');
+    }
+
+    const tourCreate = await createFullTourService(data);
+
+    res.status(201).json(tourCreate);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
   }
 }
 

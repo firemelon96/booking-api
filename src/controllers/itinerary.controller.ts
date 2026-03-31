@@ -17,7 +17,7 @@ export async function addItineraryCtrl(req: Request, res: Response) {
       ...body,
     });
 
-    res.status(401).json(create);
+    res.status(201).json(create);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

@@ -1,3 +1,4 @@
+import cloudinary from '../config/cloudinary';
 import { prisma } from '../config/prisma';
 import { Role } from '../generated/prisma/enums';
 
@@ -21,11 +22,32 @@ export async function updateUserRole(id: string, role: Role) {
 }
 
 export async function getAllUsers(id: string) {
-  return await prisma.user.findMany({ where: { NOT: { id } } });
+  return await prisma.user.findMany({
+    where: { NOT: { id } },
+    include: { image: true },
+  });
 }
 
-export async function setProfileImage(userId: string, ImageId: string) {
+export async function setProfileImage(userId: string, imageId: string) {
   const existing = await prisma.image.findFirst({
-    where: {},
+    where: {
+      userId,
+      type: 'PROFILE',
+      status: 'ACTIVE',
+    },
+  });
+
+  if (existing) {
+    await cloudinary.uploader.destroy(existing.publicId);
+    await prisma.image.delete({ where: { id: existing.id } });
+  }
+
+  return prisma.image.update({
+    where: { id: imageId },
+    data: {
+      userId,
+      type: 'PROFILE',
+      status: 'ACTIVE',
+    },
   });
 }

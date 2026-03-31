@@ -5,6 +5,7 @@ import {
   getBySlug,
   remove,
   update,
+  createFullTour,
 } from '../controllers/tour.controller';
 import { authenticate } from '../middlewares/auth.middleware';
 import { requireAdmin } from '../middlewares/role.middleware';
@@ -73,13 +74,14 @@ const router = Router();
 
 (router.get('/', list), router.get('/:slug', getBySlug));
 
-router.post('/', authenticate, requireAdmin, create);
+// router.post('/', authenticate, requireAdmin, create);
+router.post('/', authenticate, requireAdmin, createFullTour);
 router.patch('/:id', authenticate, requireAdmin, update);
 router.delete('/:id', authenticate, requireAdmin, remove);
 
-router.use('/:tourId/pricing', tourPricingRoutes);
-
 router.use('/:tourId/featured', imageRoutes);
+
+router.use('/:tourId/pricing', tourPricingRoutes);
 
 router.use('/:tourId/availability', availabilityRoutes);
 
