@@ -17,6 +17,7 @@ export async function createBooking(params: {
     where: { id: tourId },
     select: { id: true, joinerCapacity: true },
   });
+
   if (!tour) throw new Error('Tour not found');
 
   const requested = normalizeInterval(params.startDate, params.endDate);
@@ -102,7 +103,7 @@ export async function createBooking(params: {
       tourId,
       pricingType,
       participants,
-      total: pricing.totalPrice,
+      totalPrice: pricing.totalPrice,
       startDate: requested.start,
       endDate: params.endDate ? requested.end : null,
     },
