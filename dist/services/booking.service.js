@@ -77,7 +77,7 @@ async function createBooking(params) {
             tourId,
             pricingType,
             participants,
-            total: pricing.totalPrice,
+            totalPrice: pricing.totalPrice,
             startDate: requested.start,
             endDate: params.endDate ? requested.end : null,
         },
