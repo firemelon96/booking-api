@@ -5,7 +5,9 @@ import { BookingStatus, PaymentStatus } from '../generated/prisma/browser';
 export async function xenditWebhook(req: Request, res: Response) {
   const body = req.body;
 
-  const signature = req.headers['X-CALLBACK-TOKEN'] as string;
+  const signature = req.headers['x-callback-token'] as string;
+
+  console.log(req.headers);
 
   if (signature !== process.env.XENDIT_WEBHOOK_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' });
