@@ -6,7 +6,6 @@ import {
 } from '../validators/tour.schema';
 import {
   createFullTourService,
-  createTour,
   deleteTour,
   getTourBySlug,
   listTours,
@@ -53,21 +52,21 @@ export async function createFullTour(req: Request, res: Response) {
   }
 }
 
-export async function create(req: Request, res: Response) {
-  try {
-    const data = createTourSchema.parse(req.body);
-    const tour = await createTour(data);
-    res.status(201).json(tour);
-  } catch (err: any) {
-    if (req.body.images) {
-      for (const img of req.body.images) {
-        await cloudinary.uploader.destroy(img.public_id);
-      }
-    }
+// export async function create(req: Request, res: Response) {
+//   try {
+//     const data = createTourSchema.parse(req.body);
+//     const tour = await createTour(data);
+//     res.status(201).json(tour);
+//   } catch (err: any) {
+//     if (req.body.images) {
+//       for (const img of req.body.images) {
+//         await cloudinary.uploader.destroy(img.public_id);
+//       }
+//     }
 
-    res.status(400).json({ error: err.message });
-  }
-}
+//     res.status(400).json({ error: err.message });
+//   }
+// }
 
 export async function update(req: Request, res: Response) {
   try {
