@@ -33,7 +33,7 @@ app.use('/api/pricing', pricingRoutes);
 
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/upload', uploadRoutes);
+// app.use('/api/upload', uploadRoutes);
 app.use('/api/payments', paymentRoutes);
 
 app.use('/api/webhook', webhookRoutes);
