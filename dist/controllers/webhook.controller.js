@@ -5,7 +5,6 @@ const prisma_1 = require("../config/prisma");
 async function xenditWebhook(req, res) {
     const body = req.body;
     const signature = req.headers['x-callback-token'];
-    console.log(req.headers);
     if (signature !== process.env.XENDIT_WEBHOOK_SECRET) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
