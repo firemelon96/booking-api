@@ -4,6 +4,10 @@ exports.xenditWebhook = xenditWebhook;
 const prisma_1 = require("../config/prisma");
 async function xenditWebhook(req, res) {
     const body = req.body;
+    const signature = req.headers['X-CALLBACK-TOKEN'];
+    if (signature !== process.env.XENDIT_WEBHOOK_SECRET) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
     const payment = await prisma_1.prisma.payment.findFirst({
         where: { xenditInvoiceId: body.id },
     });

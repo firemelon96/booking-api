@@ -1,14 +1,15 @@
 import { Request, Response } from 'express';
 import { prisma } from '../config/prisma';
-import {
-  BookingStatus,
-  Payment,
-  PaymentStatus,
-} from '../generated/prisma/browser';
-import { PaymentScalarFieldEnum } from '../generated/prisma/internal/prismaNamespaceBrowser';
+import { BookingStatus, PaymentStatus } from '../generated/prisma/browser';
 
 export async function xenditWebhook(req: Request, res: Response) {
   const body = req.body;
+
+  const signature = req.headers['X-CALLBACK-TOKEN'] as string;
+
+  if (signature !== process.env.XENDIT_WEBHOOK_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
 
   const payment = await prisma.payment.findFirst({
     where: { xenditInvoiceId: body.id },
