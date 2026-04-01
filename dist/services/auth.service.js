@@ -25,6 +25,9 @@ async function loginUser(email, password) {
     if (!user) {
         throw new Error('Invalid credentials');
     }
+    if (!user.password) {
+        throw new Error('User registered with Google. Please login with Google.');
+    }
     const isValid = await bcrypt_1.default.compare(password, user.password);
     if (!isValid) {
         throw new Error('Invalid credentials');

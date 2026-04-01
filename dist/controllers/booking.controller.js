@@ -1,16 +1,16 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.create = create;
-exports.me = me;
+exports.myBookings = myBookings;
 const booking_schema_1 = require("../validators/booking.schema");
-const boooking_service_1 = require("../services/boooking.service");
+const booking_service_1 = require("../services/booking.service");
 async function create(req, res) {
     try {
         if (!req.user?.userId) {
             return res.status(401).json({ error: 'Unauthorized' });
         }
         const body = booking_schema_1.createBookingSchema.parse(req.body);
-        const booking = await (0, boooking_service_1.createBooking)({
+        const booking = await (0, booking_service_1.createBooking)({
             userId: req.user.userId,
             tourId: body.tourId,
             pricingType: body.pricingType,
@@ -28,12 +28,12 @@ async function create(req, res) {
         return res.status(400).json({ error: msg });
     }
 }
-async function me(req, res) {
+async function myBookings(req, res) {
     try {
         if (!req.user?.userId) {
             return res.status(401).json({ error: 'Unauthorized' });
         }
-        const bookings = await (0, boooking_service_1.listMyBookings)(req.user.userId);
+        const bookings = await (0, booking_service_1.listMyBookings)(req.user.userId);
         return res.json(bookings);
     }
     catch (err) {

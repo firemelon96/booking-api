@@ -9,6 +9,8 @@ const auth_middleware_1 = require("../middlewares/auth.middleware");
 const role_middleware_1 = require("../middlewares/role.middleware");
 const tourPricing_routes_1 = __importDefault(require("./tourPricing.routes"));
 const availability_routes_1 = __importDefault(require("./availability.routes"));
+const image_routes_1 = __importDefault(require("./image.routes"));
+const itinerary_routes_1 = __importDefault(require("./itinerary.routes"));
 /**
  * @swagger
  * /api/tours:
@@ -64,9 +66,12 @@ const availability_routes_1 = __importDefault(require("./availability.routes"));
  */
 const router = (0, express_1.Router)();
 (router.get('/', tour_controller_1.list), router.get('/:slug', tour_controller_1.getBySlug));
-router.post('/', auth_middleware_1.authenticate, role_middleware_1.requireAdmin, tour_controller_1.create);
+// router.post('/', authenticate, requireAdmin, create);
+router.post('/', auth_middleware_1.authenticate, role_middleware_1.requireAdmin, tour_controller_1.createFullTour);
 router.patch('/:id', auth_middleware_1.authenticate, role_middleware_1.requireAdmin, tour_controller_1.update);
 router.delete('/:id', auth_middleware_1.authenticate, role_middleware_1.requireAdmin, tour_controller_1.remove);
+router.use('/:tourId/featured', image_routes_1.default);
 router.use('/:tourId/pricing', tourPricing_routes_1.default);
 router.use('/:tourId/availability', availability_routes_1.default);
+router.use('/:tourId/itinerary', itinerary_routes_1.default);
 exports.default = router;

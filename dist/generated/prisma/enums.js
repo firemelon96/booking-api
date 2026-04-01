@@ -9,7 +9,7 @@
 * 🟢 You can import this file directly.
 */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Role = exports.PricingType = void 0;
+exports.PaymentStatus = exports.BookingStatus = exports.ImageStatus = exports.ImageType = exports.Role = exports.PricingType = void 0;
 exports.PricingType = {
     joiner: 'joiner',
     private: 'private'
@@ -17,4 +17,24 @@ exports.PricingType = {
 exports.Role = {
     USER: 'USER',
     ADMIN: 'ADMIN'
+};
+exports.ImageType = {
+    TOUR: 'TOUR',
+    ITINERARY: 'ITINERARY',
+    PROFILE: 'PROFILE'
+};
+exports.ImageStatus = {
+    TEMP: 'TEMP',
+    ACTIVE: 'ACTIVE'
+};
+exports.BookingStatus = {
+    PENDING: 'PENDING',
+    CONFIRMED: 'CONFIRMED',
+    CANCELLED: 'CANCELLED'
+};
+exports.PaymentStatus = {
+    PENDING: 'PENDING',
+    PAID: 'PAID',
+    EXPIRED: 'EXPIRED',
+    FAILED: 'FAILED'
 };

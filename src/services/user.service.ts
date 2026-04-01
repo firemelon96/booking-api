@@ -24,14 +24,16 @@ export async function updateUserRole(id: string, role: Role) {
 export async function getAllUsers(id: string) {
   return await prisma.user.findMany({
     where: { NOT: { id } },
-    include: { image: true },
+    include: {
+      profileImage: true,
+    },
   });
 }
 
 export async function setProfileImage(userId: string, imageId: string) {
   const existing = await prisma.image.findFirst({
     where: {
-      userId,
+      userProfile: { id: userId },
       type: 'PROFILE',
       status: 'ACTIVE',
     },
@@ -45,7 +47,7 @@ export async function setProfileImage(userId: string, imageId: string) {
   return prisma.image.update({
     where: { id: imageId },
     data: {
-      userId,
+      userProfile: { connect: { id: userId } },
       type: 'PROFILE',
       status: 'ACTIVE',
     },

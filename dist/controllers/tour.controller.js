@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.list = list;
 exports.getBySlug = getBySlug;
-exports.create = create;
+exports.createFullTour = createFullTour;
 exports.update = update;
 exports.remove = remove;
 const tour_schema_1 = require("../validators/tour.schema");
@@ -29,16 +29,33 @@ async function getBySlug(req, res) {
         res.status(400).json({ error: err.message });
     }
 }
-async function create(req, res) {
+async function createFullTour(req, res) {
     try {
-        const data = tour_schema_1.createTourSchema.parse(req.body);
-        const tour = await (0, tour_service_1.createTour)(data);
-        res.status(201).json(tour);
+        const data = tour_schema_1.createFullTourSchema.parse(req.body);
+        if (!data) {
+            throw new Error('Invalid fields');
+        }
+        const tourCreate = await (0, tour_service_1.createFullTourService)(data);
+        res.status(201).json(tourCreate);
     }
-    catch (err) {
-        res.status(400).json({ error: err.message });
+    catch (error) {
+        res.status(400).json({ error: error.message });
     }
 }
+// export async function create(req: Request, res: Response) {
+//   try {
+//     const data = createTourSchema.parse(req.body);
+//     const tour = await createTour(data);
+//     res.status(201).json(tour);
+//   } catch (err: any) {
+//     if (req.body.images) {
+//       for (const img of req.body.images) {
+//         await cloudinary.uploader.destroy(img.public_id);
+//       }
+//     }
+//     res.status(400).json({ error: err.message });
+//   }
+// }
 async function update(req, res) {
     try {
         const id = req.params.id;

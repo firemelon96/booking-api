@@ -48,7 +48,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.NullsOrder = exports.QueryMode = exports.SortOrder = exports.BookingScalarFieldEnum = exports.TourPricingScalarFieldEnum = exports.TourScalarFieldEnum = exports.UserScalarFieldEnum = exports.TransactionIsolationLevel = exports.ModelName = exports.AnyNull = exports.JsonNull = exports.DbNull = exports.NullTypes = exports.Decimal = void 0;
+exports.NullsOrder = exports.QueryMode = exports.SortOrder = exports.PaymentScalarFieldEnum = exports.BookingScalarFieldEnum = exports.TourPricingScalarFieldEnum = exports.ImageScalarFieldEnum = exports.ItineraryScalarFieldEnum = exports.TourScalarFieldEnum = exports.UserScalarFieldEnum = exports.TransactionIsolationLevel = exports.ModelName = exports.AnyNull = exports.JsonNull = exports.DbNull = exports.NullTypes = exports.Decimal = void 0;
 const runtime = __importStar(require("@prisma/client/runtime/index-browser"));
 exports.Decimal = runtime.Decimal;
 exports.NullTypes = {
@@ -77,8 +77,11 @@ exports.AnyNull = runtime.AnyNull;
 exports.ModelName = {
     User: 'User',
     Tour: 'Tour',
+    Itinerary: 'Itinerary',
+    Image: 'Image',
     TourPricing: 'TourPricing',
-    Booking: 'Booking'
+    Booking: 'Booking',
+    Payment: 'Payment'
 };
 /*
  * Enums
@@ -93,13 +96,33 @@ exports.UserScalarFieldEnum = {
     id: 'id',
     email: 'email',
     password: 'password',
-    role: 'role'
+    googleId: 'googleId',
+    name: 'name',
+    role: 'role',
+    profileImageId: 'profileImageId'
 };
 exports.TourScalarFieldEnum = {
     id: 'id',
     name: 'name',
     slug: 'slug',
     joinerCapacity: 'joinerCapacity'
+};
+exports.ItineraryScalarFieldEnum = {
+    id: 'id',
+    title: 'title',
+    activities: 'activities',
+    destinations: 'destinations',
+    tourId: 'tourId'
+};
+exports.ImageScalarFieldEnum = {
+    id: 'id',
+    url: 'url',
+    publicId: 'publicId',
+    isFeatured: 'isFeatured',
+    type: 'type',
+    status: 'status',
+    tourId: 'tourId',
+    createdAt: 'createdAt'
 };
 exports.TourPricingScalarFieldEnum = {
     id: 'id',
@@ -116,10 +139,18 @@ exports.BookingScalarFieldEnum = {
     tourId: 'tourId',
     pricingType: 'pricingType',
     participants: 'participants',
-    total: 'total',
+    totalPrice: 'totalPrice',
+    status: 'status',
     startDate: 'startDate',
     endDate: 'endDate',
     createdAt: 'createdAt'
+};
+exports.PaymentScalarFieldEnum = {
+    id: 'id',
+    bookingId: 'bookingId',
+    xenditInvoiceId: 'xenditInvoiceId',
+    invoiceUrl: 'invoiceUrl',
+    status: 'status'
 };
 exports.SortOrder = {
     asc: 'asc',

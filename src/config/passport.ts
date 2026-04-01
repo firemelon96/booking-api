@@ -25,7 +25,11 @@ passport.use(
           });
         }
 
-        return done(null, user);
+        return done(null, {
+          userId: user.id,
+          email: user.email,
+          role: user.role,
+        });
       } catch (err) {
         return done(err, undefined);
       }
