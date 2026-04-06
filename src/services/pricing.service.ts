@@ -1,6 +1,5 @@
 import { prisma } from '../config/prisma';
-
-type PricingType = 'joiner' | 'private';
+import { PricingType } from '../types/pricing-type';
 
 export async function calculateTotalPrice(params: {
   tourId: string;
@@ -18,7 +17,7 @@ export async function calculateTotalPrice(params: {
   });
 
   if (!prices.length) {
-    throw new Error('No pricing for thi tour and pricing type');
+    throw new Error('No pricing for this tour and pricing type');
   }
 
   const matched = prices.find(

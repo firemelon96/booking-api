@@ -1,58 +1,32 @@
 import { prisma } from '../config/prisma';
-import { normalizeInterval, overlaps } from '../utils/helper';
+import {
+  getExistingBookings,
+  getTourOrThrow,
+  normalizeInterval,
+  overlaps,
+} from '../utils/helper';
 import { calculateTotalPrice } from './pricing.service';
 import { eachDayOfInterval } from 'date-fns';
 
 export async function createBooking(params: {
   userId: string;
   tourId: string;
-  pricingType: 'joiner' | 'private';
+  pricingType: 'JOINER' | 'PRIVATE';
   participants: number;
   startDate: Date;
   endDate?: Date | null;
 }) {
   const { userId, tourId, pricingType, participants } = params;
 
-  const tour = await prisma.tour.findUnique({
-    where: { id: tourId },
-    select: { id: true, joinerCapacity: true },
-  });
+  const tour = await getTourOrThrow(tourId);
 
-  if (!tour) throw new Error('Tour not found');
+  const requestedInterval = normalizeInterval(params.startDate, params.endDate);
 
-  const requested = normalizeInterval(params.startDate, params.endDate);
+  const existingBookings = await getExistingBookings(tourId, requestedInterval);
 
-  const existingBookings = await prisma.booking.findMany({
-    where: {
-      tourId,
-      OR: [
-        {
-          endDate: { not: null, gte: requested.start },
-          startDate: { lte: requested.end },
-        },
-        {
-          endDate: null,
-          startDate: { gte: requested.start, lte: requested.end },
-        },
-      ],
-    },
-    select: {
-      id: true,
-      pricingType: true,
-      participants: true,
-      startDate: true,
-      endDate: true,
-    },
-  });
-
-  const normalizedExisting = existingBookings.map((b) => ({
-    ...b,
-    interval: normalizeInterval(b.startDate, b.endDate),
-  }));
-
-  if (pricingType === 'private') {
-    const conflict = normalizedExisting.find((b) =>
-      overlaps(b.interval, requested),
+  if (pricingType === 'PRIVATE') {
+    const conflict = existingBookings.find((b) =>
+      overlaps(b.interval, requestedInterval),
     );
     if (conflict) {
       throw new Error(
@@ -61,14 +35,14 @@ export async function createBooking(params: {
     }
   }
 
-  if (pricingType === 'joiner') {
-    const days = eachDayOfInterval(requested);
+  if (pricingType === 'JOINER') {
+    const days = eachDayOfInterval(requestedInterval);
 
     for (const day of days) {
       const dayInterval = normalizeInterval(day, day);
 
-      const privateConflict = normalizedExisting.find(
-        (b) => b.pricingType === 'private' && overlaps(b.interval, dayInterval),
+      const privateConflict = existingBookings.find(
+        (b) => b.pricingType === 'PRIVATE' && overlaps(b.interval, dayInterval),
       );
 
       if (privateConflict) {
@@ -77,8 +51,8 @@ export async function createBooking(params: {
         );
       }
 
-      const used = normalizedExisting.reduce((sum, b) => {
-        if (b.pricingType !== 'joiner') return sum;
+      const used = existingBookings.reduce((sum, b) => {
+        if (b.pricingType !== 'JOINER') return sum;
         return overlaps(b.interval, dayInterval) ? sum + b.participants : sum;
       }, 0);
 
@@ -104,8 +78,8 @@ export async function createBooking(params: {
       pricingType,
       participants,
       totalPrice: pricing.totalPrice,
-      startDate: requested.start,
-      endDate: params.endDate ? requested.end : null,
+      startDate: requestedInterval.start,
+      endDate: params.endDate ? requestedInterval.end : null,
     },
     include: {
       tour: {

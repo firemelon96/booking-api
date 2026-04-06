@@ -11,7 +11,6 @@ import {
   listTours,
   updateTour,
 } from '../services/tour.service';
-import cloudinary from '../config/cloudinary';
 
 export async function list(req: Request, res: Response) {
   try {

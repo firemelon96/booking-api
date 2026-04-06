@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const pricingTypeEnum = z.enum(['joiner', 'private']);
+const pricingTypeEnum = z.enum(['JOINER', 'PRIVATE']);
 
 export const createTourPricingSchema = z
   .object({

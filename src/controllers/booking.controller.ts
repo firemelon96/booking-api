@@ -15,8 +15,8 @@ export async function create(req: Request, res: Response) {
       tourId: body.tourId,
       pricingType: body.pricingType,
       startDate: new Date(body.startDate),
-      participants: body.participants,
       endDate: body.endDate ? new Date(body.endDate) : null,
+      participants: body.participants,
     });
 
     res.status(201).json(booking);

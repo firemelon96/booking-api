@@ -1,6 +1,5 @@
 import { prisma } from '../config/prisma';
-
-type PricingType = 'joiner' | 'private';
+import { PricingType } from '../types/pricing-type';
 
 function rangesOverlap(aMin: number, aMax: number, bmin: number, bMax: number) {
   return Math.max(aMin, bmin) <= Math.min(aMax, bMax);

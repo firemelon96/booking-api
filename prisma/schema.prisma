@@ -32,10 +32,35 @@ model Tour {
   name    String
   slug    String        @unique
   joinerCapacity Int @default(12)
+
+  description String
+  highlights String[]
+  inclusions String[]
+  exclusions String[]
+  location    String
+  durationDays    Int? //For day tours, this will be null. For package tours, this will be the total duration of the tour in days.
+  types       TourType  @default(DAY)  
+
+  schedules   TourScheduleOption[] //For package tours, this will be empty and the schedule will be determined by the itinerary.
   images  Image[]
   pricing TourPricing[]
   bookings Booking[]
   itineraries Itinerary[]
+
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model TourScheduleOption {
+  id      String      @id @default(uuid())
+  schedule TourSchedule 
+
+  tourId  String
+  tour    Tour        @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
+  bookings Booking[] //For package tours, this will be empty and the schedule will be determined by the itinerary.
+
+  createdAt DateTime    @default(now())
 }
 
 model Itinerary {
@@ -47,7 +72,6 @@ model Itinerary {
   tourId  String
   tour    Tour        @relation(fields: [tourId], references: [id], onDelete: Cascade)
 }
-
 
 model Image {
   id          String      @id @default(uuid())
@@ -71,9 +95,9 @@ model TourPricing {
   pricingType  PricingType
   minGroupSize Int
   maxGroupSize Int
-  price        Int
-  isGroupPrice Boolean  @default(false)
+  price        Float
   tourId       String
+  isGroupPrice Boolean @default(false) //For joiner tours, this will be true. For private tours, this will be false.
   tour         Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
 }
 
@@ -91,12 +115,16 @@ model Booking {
   startDate DateTime
   endDate   DateTime?
 
+  scheduleId String? //For package tours, this will be null and the schedule will be determined by the itinerary.
+
   payments Payment?
   
   user User @relation(fields: [userId], references: [id], onDelete: Restrict)
   tour Tour @relation(fields: [tourId], references: [id], onDelete: Restrict)
+  schedule TourScheduleOption? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([tourId, startDate])
   @@index([tourId, pricingType, startDate])
@@ -113,9 +141,21 @@ model Payment {
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 }
 
+enum TourType {
+  DAY
+  PACKAGE
+}
+
+enum TourSchedule {
+  MORNING
+  AFTERNOON
+  EVENING
+  WHOLE_DAY
+}
+
 enum PricingType {
-  joiner
-  private
+  JOINER
+  PRIVATE
 }
 
 enum Role {

@@ -22,8 +22,10 @@ export const updateTourSchema = z.object({
     .max(140)
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug must be kebab-case')
     .optional(),
-  existingImageIds: z.string().array(),
-  newImageIds: z.string().array(),
+  description: z.string().min(20).max(200),
+  location: z.string(),
+  inclusions: z.string().array(),
+  exclusions: z.string().array(),
 });
 
 export const createFullTourSchema = z.object({
@@ -34,10 +36,10 @@ export const createFullTourSchema = z.object({
     .max(140)
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug must be kebab-case')
     .optional(),
-  // description: z.string().min(20).max(200),
-  // address: z.string(),
-  // inclusions: z.string().array(),
-  // exclusions: z.string().array(),
+  description: z.string().min(20).max(200),
+  location: z.string(),
+  inclusions: z.string().array(),
+  exclusions: z.string().array(),
   imageIds: z.string().array(),
   itineraries: createItinerarySchema.array(),
   pricing: createTourPricingSchema.array(),

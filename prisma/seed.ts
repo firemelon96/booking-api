@@ -36,6 +36,16 @@ async function main() {
     data: {
       name: 'Puerto Princesa Underground River Tour',
       slug: 'puerto-princesa-underground-river',
+      description:
+        'Explore the stunning underground river in Puerto Princesa, Palawan.',
+      inclusions: [
+        'Hotel pickup and drop-off',
+        'Lunch',
+        'Tour guide',
+        'Entrance fees',
+      ],
+      exclusions: ['Personal expenses', 'Gratuities'],
+      location: 'Puerto Princesa, Palawan',
     },
   });
 
@@ -44,7 +54,7 @@ async function main() {
     data: [
       {
         tourId: tour.id,
-        pricingType: PricingType.joiner,
+        pricingType: PricingType.JOINER,
         minGroupSize: 1,
         maxGroupSize: 10,
         price: 2000,
@@ -52,7 +62,7 @@ async function main() {
       },
       {
         tourId: tour.id,
-        pricingType: PricingType.private,
+        pricingType: PricingType.PRIVATE,
         minGroupSize: 1,
         maxGroupSize: 2,
         price: 5000,
@@ -60,7 +70,7 @@ async function main() {
       },
       {
         tourId: tour.id,
-        pricingType: PricingType.private,
+        pricingType: PricingType.PRIVATE,
         minGroupSize: 3,
         maxGroupSize: 5,
         price: 8000,
@@ -76,10 +86,21 @@ async function main() {
       tourId: tour.id,
       totalPrice: 5000,
       startDate: new Date('2026-02-01'),
-      pricingType: 'joiner',
+      pricingType: PricingType.JOINER,
       participants: 3,
     },
   });
+
+  //create itinerary fo the tour
+  // await prisma.itinerary.create({
+  //   data: {
+  //     tourId: tour.id,
+  //     day: 1,
+  //     title: 'Hotel Pickup and Travel to Underground River',
+  //     description:
+  //       'Our friendly guide will pick you up from your hotel in Puerto Princesa and take you to the underground river. Enjoy the scenic drive and get ready for an unforgettable adventure.',
+  //   },
+  // });
 
   console.log('✅ Seed completed');
   console.log('👤 Admin:', admin.email);
