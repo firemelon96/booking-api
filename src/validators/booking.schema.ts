@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const createBookingSchema = z
   .object({
     tourId: z.uuid(),
-    pricingType: z.enum(['joiner', 'private']),
+    pricingType: z.enum(['JOINER', 'PRIVATE']),
     participants: z.number().int().min(1).max(100),
     startDate: z.iso.datetime(),
     endDate: z.iso.datetime().optional(),
@@ -20,7 +20,7 @@ export const createBookingSchema = z
   )
   .refine(
     (d) => {
-      if (d.pricingType === 'joiner') return !d.endDate;
+      if (d.pricingType === 'JOINER') return !d.endDate;
       return true;
     },
     {

@@ -7,6 +7,7 @@ import {
 import {
   createFullTourService,
   deleteTour,
+  getTourById,
   getTourBySlug,
   listTours,
   updateTour,
@@ -32,6 +33,20 @@ export async function getBySlug(req: Request, res: Response) {
     res.json(tour);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
+  }
+}
+
+export async function getById(req: Request, res: Response) {
+  try {
+    const id = req.params.id;
+    if (Array.isArray(id)) {
+      return res.status(400).json({ error: 'Invalid id' });
+    }
+
+    const tour = await getTourById(id);
+    res.json(tour);
+  } catch (error: any) {
+    res.status(404).json({ error: error.message });
   }
 }
 

@@ -1,9 +1,11 @@
+import { validate } from 'node-cron';
 import { prisma } from '../config/prisma';
 import {
   getExistingBookings,
   getTourOrThrow,
   normalizeInterval,
   overlaps,
+  validateAvailability,
 } from '../utils/helper';
 import { calculateTotalPrice } from './pricing.service';
 import { eachDayOfInterval } from 'date-fns';
@@ -24,46 +26,54 @@ export async function createBooking(params: {
 
   const existingBookings = await getExistingBookings(tourId, requestedInterval);
 
-  if (pricingType === 'PRIVATE') {
-    const conflict = existingBookings.find((b) =>
-      overlaps(b.interval, requestedInterval),
-    );
-    if (conflict) {
-      throw new Error(
-        'Date not available: private booking requires exclusive availability.',
-      );
-    }
-  }
+  validateAvailability(
+    pricingType,
+    existingBookings,
+    requestedInterval,
+    tour.joinerCapacity,
+    participants,
+  );
 
-  if (pricingType === 'JOINER') {
-    const days = eachDayOfInterval(requestedInterval);
+  // if (pricingType === 'PRIVATE') {
+  //   const conflict = existingBookings.find((b) =>
+  //     overlaps(b.interval, requestedInterval),
+  //   );
+  //   if (conflict) {
+  //     throw new Error(
+  //       'Date not available: private booking requires exclusive availability.',
+  //     );
+  //   }
+  // }
 
-    for (const day of days) {
-      const dayInterval = normalizeInterval(day, day);
+  // if (pricingType === 'JOINER') {
+  //   const days = eachDayOfInterval(requestedInterval);
 
-      const privateConflict = existingBookings.find(
-        (b) => b.pricingType === 'PRIVATE' && overlaps(b.interval, dayInterval),
-      );
+  //   for (const day of days) {
+  //     const dayInterval = normalizeInterval(day, day);
 
-      if (privateConflict) {
-        throw new Error(
-          'Date not available: private booking exists on the selected date.',
-        );
-      }
+  //     const privateConflict = existingBookings.find(
+  //       (b) => b.pricingType === 'PRIVATE' && overlaps(b.interval, dayInterval),
+  //     );
 
-      const used = existingBookings.reduce((sum, b) => {
-        if (b.pricingType !== 'JOINER') return sum;
-        return overlaps(b.interval, dayInterval) ? sum + b.participants : sum;
-      }, 0);
+  //     if (privateConflict) {
+  //       throw new Error(
+  //         'Date not available: private booking exists on the selected date.',
+  //       );
+  //     }
 
-      if (used + participants > tour.joinerCapacity) {
-        const dayStr = day.toISOString().slice(0, 10);
-        throw new Error(
-          `Capacity exceeded for ${dayStr}: ${used}/${tour.joinerCapacity} already booked.`,
-        );
-      }
-    }
-  }
+  //     const used = existingBookings.reduce((sum, b) => {
+  //       if (b.pricingType !== 'JOINER') return sum;
+  //       return overlaps(b.interval, dayInterval) ? sum + b.participants : sum;
+  //     }, 0);
+
+  //     if (used + participants > tour.joinerCapacity) {
+  //       const dayStr = day.toISOString().slice(0, 10);
+  //       throw new Error(
+  //         `Capacity exceeded for ${dayStr}: ${used}/${tour.joinerCapacity} already booked.`,
+  //       );
+  //     }
+  //   }
+  // }
 
   const pricing = await calculateTotalPrice({
     tourId,
@@ -97,7 +107,11 @@ export async function listMyBookings(userId: string) {
     orderBy: { createdAt: 'desc' },
     include: {
       tour: {
-        select: { id: true, name: true, slug: true },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+        },
       },
     },
   });

@@ -1,4 +1,9 @@
-import { areIntervalsOverlapping, Interval, startOfDay } from 'date-fns';
+import {
+  areIntervalsOverlapping,
+  eachDayOfInterval,
+  Interval,
+  startOfDay,
+} from 'date-fns';
 import { prisma } from '../config/prisma';
 
 export function normalizeInterval(start: Date, end?: Date | null) {
@@ -57,7 +62,13 @@ export async function getExistingBookings(
   }));
 }
 
-export async function validateAvailability(pricingType: 'JOINER' | 'PRIVATE') {
+export function validateAvailability(
+  pricingType: 'JOINER' | 'PRIVATE',
+  existingBookings: Awaited<ReturnType<typeof getExistingBookings>>,
+  requestedInterval: { start: Date; end: Date },
+  joinerCapacity: number,
+  participants: number,
+) {
   if (pricingType === 'PRIVATE') {
     const conflict = existingBookings.find((b) =>
       overlaps(b.interval, requestedInterval),
@@ -90,10 +101,10 @@ export async function validateAvailability(pricingType: 'JOINER' | 'PRIVATE') {
         return overlaps(b.interval, dayInterval) ? sum + b.participants : sum;
       }, 0);
 
-      if (used + participants > tour.joinerCapacity) {
+      if (used + participants > joinerCapacity) {
         const dayStr = day.toISOString().slice(0, 10);
         throw new Error(
-          `Capacity exceeded for ${dayStr}: ${used}/${tour.joinerCapacity} already booked.`,
+          `Capacity exceeded for ${dayStr}: ${used}/${joinerCapacity} already booked.`,
         );
       }
     }

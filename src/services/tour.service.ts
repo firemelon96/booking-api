@@ -106,7 +106,20 @@ export async function getTourBySlug(slug: string) {
     include: { pricing: true },
   });
 
-  if (!tour) throw new Error('Tour not found');
+  if (!tour) throw new Error('Tour slug not found');
+  return tour;
+}
+
+export async function getTourById(id: string) {
+  const tour = await prisma.tour.findUnique({
+    where: {
+      id,
+    },
+    include: { pricing: true, images: true, itineraries: true },
+  });
+
+  if (!tour) throw new Error('Tour not founded');
+
   return tour;
 }
 
@@ -206,14 +219,15 @@ export async function updateTourImages(
 
 export async function updateTour(
   id: string,
-  input: {
+  input: Partial<{
     name: string;
     slug?: string;
     description: string;
     location: string;
     exclusions: string[];
     inclusions: string[];
-  },
+    types: 'DAY' | 'PACKAGE';
+  }>,
 ) {
   const existingTour = await prisma.tour.findUnique({ where: { id } });
 
@@ -228,16 +242,15 @@ export async function updateTour(
     if (slugExists) throw new Error('Slug already exists');
   }
 
+  const data = Object.fromEntries(
+    Object.entries({ ...input, slug: nextSlug }).filter(
+      ([_, value]) => value !== undefined,
+    ),
+  );
+
   return prisma.tour.update({
     where: { id },
-    data: {
-      name: input.name,
-      slug: nextSlug,
-      description: input.description,
-      location: input.location,
-      exclusions: input.exclusions || existingTour.exclusions,
-      inclusions: input.inclusions || existingTour.inclusions,
-    },
+    data,
   });
 }
 

@@ -12,6 +12,17 @@ export async function addItinerary(params: {
     throw new Error('Tour not found');
   }
 
+  const existing = await prisma.itinerary.findFirst({
+    where: {
+      tourId: params.tourId,
+      title: params.title,
+    },
+  });
+
+  if (existing) {
+    throw new Error('Itinerary with this title already exists for this tour');
+  }
+
   return prisma.itinerary.create({
     data: {
       tourId: params.tourId,

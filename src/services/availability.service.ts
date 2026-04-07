@@ -1,8 +1,7 @@
 import { prisma } from '../config/prisma';
 import { parseISO, eachDayOfInterval } from 'date-fns';
 import { normalizeInterval, overlaps } from '../utils/helper';
-
-type PricingType = 'joiner' | 'private';
+import { PricingType } from '../types/pricing-type';
 
 function dayKey(d: Date) {
   return d.toISOString().slice(0, 10);
@@ -58,11 +57,11 @@ export async function getTourAvailability(params: {
     const dayInterval = normalizeInterval(day, day);
 
     const hasPrivate = normalized.some(
-      (b) => b.pricingType === 'private' && overlaps(b.interval, dayInterval),
+      (b) => b.pricingType === 'PRIVATE' && overlaps(b.interval, dayInterval),
     );
 
     const usedJoiner = normalized.reduce((sum, b) => {
-      if (b.pricingType !== 'joiner') return sum;
+      if (b.pricingType !== 'JOINER') return sum;
 
       return overlaps(b.interval, dayInterval) ? sum + b.participants : sum;
     }, 0);

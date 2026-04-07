@@ -39,7 +39,8 @@ model Tour {
   exclusions String[]
   location    String
   durationDays    Int? //For day tours, this will be null. For package tours, this will be the total duration of the tour in days.
-  types       TourType  @default(DAY)  
+  types       TourType  @default(DAY) 
+  timezone  String @default("Asia/Manila") 
 
   schedules   TourScheduleOption[] //For package tours, this will be empty and the schedule will be determined by the itinerary.
   images  Image[]
@@ -65,12 +66,42 @@ model TourScheduleOption {
 
 model Itinerary {
   id      String      @id @default(uuid())
-  title   String
-  activities  String[]
-  destinations  String[]
+  days    ItineraryDay[]
 
   tourId  String
   tour    Tour        @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model ItineraryDay {
+  id          String      @id @default(uuid())
+  dayNumber   Int
+  title       String?
+
+  itineraryId String
+  itinerary   Itinerary    @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+
+  items       ItineraryItem[]
+
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model ItineraryItem {
+  id          String      @id @default(uuid())
+  time   String //Can be a specific time (e.g. 9:00 AM) or a time range (e.g. 9:00 AM - 11:00 AM) or a general time of day (e.g. Morning, Afternoon, Evening)
+  title       String
+  description String?
+
+  order       Int
+
+  dayId String
+  day   ItineraryDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 }
 
 model Image {
