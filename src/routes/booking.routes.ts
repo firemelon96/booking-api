@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../middlewares/auth.middleware';
 import * as ctrl from '../controllers/booking.controller';
+import { requireAdmin } from '../middlewares/role.middleware';
 
 const router = Router();
 
@@ -54,6 +55,7 @@ const router = Router();
  */
 
 router.post('/create', authenticate, ctrl.create);
-router.get('/', authenticate, ctrl.myBookings);
+router.get('/my-bookings', authenticate, ctrl.myBookings);
+router.get('/all-bookings', authenticate, requireAdmin, ctrl.adminGetBookings);
 
 export default router;

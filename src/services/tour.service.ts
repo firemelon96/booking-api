@@ -6,6 +6,7 @@ import groupBy from 'lodash.groupby';
 import { slugify } from '../utils/slugify';
 import { createFullTourSchema } from '../validators/tour.schema';
 import { createTourPricingSchema } from '../validators/tourPricing.schema';
+import { it } from 'node:test';
 
 // function rangesOverlap(aMin: number, aMax: number, bMin: number, bMax: number) {
 //   return Math.max(aMin, bMin) <= Math.min(aMax, bMax);
@@ -94,7 +95,22 @@ function validateNoOverlap(pricing: z.infer<typeof createTourPricingSchema>[]) {
 export async function listTours() {
   return prisma.tour.findMany({
     orderBy: [{ name: 'asc' }],
-    include: { pricing: true, images: true, itineraries: true },
+    include: {
+      pricing: true,
+      images: true,
+      itinerary: {
+        include: {
+          days: {
+            orderBy: { dayNumber: 'asc' },
+            include: {
+              items: {
+                orderBy: { order: 'asc' },
+              },
+            },
+          },
+        },
+      },
+    },
   });
 }
 
@@ -115,7 +131,22 @@ export async function getTourById(id: string) {
     where: {
       id,
     },
-    include: { pricing: true, images: true, itineraries: true },
+    include: {
+      pricing: true,
+      images: true,
+      itinerary: {
+        include: {
+          days: {
+            orderBy: { dayNumber: 'asc' },
+            include: {
+              items: {
+                orderBy: { order: 'asc' },
+              },
+            },
+          },
+        },
+      },
+    },
   });
 
   if (!tour) throw new Error('Tour not founded');
@@ -264,7 +295,7 @@ export async function createFullTourService(
     exclusions,
     inclusions,
     imageIds,
-    itineraries,
+    itinerary,
     pricing,
   } = data;
 
@@ -277,6 +308,14 @@ export async function createFullTourService(
   }
 
   validateNoOverlap(pricing);
+
+  if (!itinerary.length && pricing.length > 0) {
+    throw new Error('Itinerary is required when pricing is provided');
+  }
+
+  if (itinerary.length && pricing.length === 0) {
+    throw new Error('Pricing is required when itinerary is provided');
+  }
 
   return prisma.$transaction(async (tx) => {
     //create tour
@@ -292,14 +331,36 @@ export async function createFullTourService(
     });
 
     //create itineraries
-    if (itineraries?.length) {
-      await tx.itinerary.createMany({
-        data: itineraries.map((item) => ({
-          ...item,
-          tourId: tour.id,
-        })),
-      });
-    }
+
+    await tx.itinerary.create({
+      data: {
+        tourId: tour.id,
+        days: {
+          create: itinerary.map((day) => ({
+            dayNumber: day.dayNumber,
+            title: day.title,
+            items: {
+              create: day.items.map((item, index) => ({
+                time: item.time,
+                title: item.title,
+                description: item.description,
+                order: index,
+              })),
+            },
+          })),
+        },
+      },
+      include: {
+        days: {
+          orderBy: { dayNumber: 'asc' },
+          include: {
+            items: {
+              orderBy: { order: 'asc' },
+            },
+          },
+        },
+      },
+    });
 
     //Create pricing
     await tx.tourPricing.createMany({

@@ -1,6 +1,6 @@
 import z from 'zod';
 import { imageSchema } from './image.schema';
-import { createItinerarySchema } from './itinerary.schema';
+import { createItinerarySchema, days } from './itinerary.schema';
 import { createTourPricingSchema } from './tourPricing.schema';
 
 export const createTourSchema = z.object({
@@ -44,6 +44,6 @@ export const createFullTourSchema = z.object({
   inclusions: z.string().array(),
   exclusions: z.string().array(),
   imageIds: z.string().array(),
-  itineraries: createItinerarySchema.array(),
+  itinerary: days.array(),
   pricing: createTourPricingSchema.array(),
 });

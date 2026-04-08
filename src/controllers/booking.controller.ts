@@ -1,6 +1,10 @@
 import { Request, Response } from 'express';
 import { createBookingSchema } from '../validators/booking.schema';
-import { createBooking, listMyBookings } from '../services/booking.service';
+import {
+  createBooking,
+  listAllBookings,
+  listMyBookings,
+} from '../services/booking.service';
 
 export async function create(req: Request, res: Response) {
   try {
@@ -17,6 +21,8 @@ export async function create(req: Request, res: Response) {
       startDate: new Date(body.startDate),
       endDate: body.endDate ? new Date(body.endDate) : null,
       participants: body.participants,
+      scheduleId: body.scheduleId || null,
+      notes: body.notes || null,
     });
 
     res.status(201).json(booking);
@@ -37,6 +43,15 @@ export async function myBookings(req: Request, res: Response) {
     }
 
     const bookings = await listMyBookings(req.user.userId);
+    return res.json(bookings);
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message });
+  }
+}
+
+export async function adminGetBookings(req: Request, res: Response) {
+  try {
+    const bookings = await listAllBookings();
     return res.json(bookings);
   } catch (err: any) {
     return res.status(400).json({ error: err.message });

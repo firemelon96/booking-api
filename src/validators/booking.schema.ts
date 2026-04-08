@@ -1,3 +1,4 @@
+import { schedule } from 'node-cron';
 import { z } from 'zod';
 
 export const createBookingSchema = z
@@ -7,6 +8,8 @@ export const createBookingSchema = z
     participants: z.number().int().min(1).max(100),
     startDate: z.iso.datetime(),
     endDate: z.iso.datetime().optional(),
+    scheduleId: z.string().optional(),
+    notes: z.string().optional(),
   })
   .refine(
     (d) => {

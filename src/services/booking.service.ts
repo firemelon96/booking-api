@@ -17,6 +17,8 @@ export async function createBooking(params: {
   participants: number;
   startDate: Date;
   endDate?: Date | null;
+  scheduleId?: string | null;
+  notes?: string | null;
 }) {
   const { userId, tourId, pricingType, participants } = params;
 
@@ -90,6 +92,8 @@ export async function createBooking(params: {
       totalPrice: pricing.totalPrice,
       startDate: requestedInterval.start,
       endDate: params.endDate ? requestedInterval.end : null,
+      scheduleId: params.scheduleId || null,
+      notes: params.notes || null,
     },
     include: {
       tour: {
@@ -111,8 +115,115 @@ export async function listMyBookings(userId: string) {
           id: true,
           name: true,
           slug: true,
+          pricing: {
+            select: { price: true },
+          },
         },
       },
     },
   });
 }
+
+export async function listAllBookings() {
+  return prisma.booking.findMany({
+    orderBy: { createdAt: 'desc' },
+    include: {
+      tour: {
+        select: {
+          slug: true,
+          pricing: {
+            select: {
+              price: true,
+              minGroupSize: true,
+              maxGroupSize: true,
+              pricingType: true,
+              isGroupPrice: true,
+            },
+          },
+        },
+      },
+      user: {
+        select: {
+          name: true,
+        },
+      },
+    },
+  });
+}
+
+export async function cancelBooking(bookingId: string, userId: string) {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+  });
+
+  if (!booking) {
+    throw new Error('Booking not found');
+  }
+
+  if (booking.userId !== userId) {
+    throw new Error('Unauthorized to cancel this booking');
+  }
+
+  return prisma.booking.delete({
+    where: { id: bookingId },
+  });
+}
+
+export async function adminCancelBooking(bookingId: string) {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+  });
+
+  if (!booking) {
+    throw new Error('Booking not found');
+  }
+
+  return prisma.booking.delete({
+    where: { id: bookingId },
+  });
+}
+
+// export async function rescheduleBooking(
+//   bookingId: string,
+//   userId: string,
+//   newStartDate: Date,
+//   newEndDate?: Date | null,
+// ) {
+//   const booking = await prisma.booking.findUnique({
+//     where: { id: bookingId },
+//   });
+
+//   if (!booking) {
+//     throw new Error('Booking not found');
+//   }
+
+//   if (booking.userId !== userId) {
+//     throw new Error('Unauthorized to reschedule this booking');
+//   }
+
+//   const tour = await getTourOrThrow(booking.tourId);
+
+//   const requestedInterval = normalizeInterval(newStartDate, newEndDate);
+
+//   const existingBookings = await getExistingBookings(
+//     booking.tourId,
+//     requestedInterval,
+//     booking.id, // exclude current booking from conflict check
+//   );
+
+//   validateAvailability(
+//     booking.pricingType,
+//     existingBookings,
+//     requestedInterval,
+//     tour.joinerCapacity,
+//     booking.participants,
+//   );
+
+//   return prisma.booking.update({
+//     where: { id: bookingId },
+//     data: {
+//       startDate: requestedInterval.start,
+//       endDate: newEndDate ? requestedInterval.end : null,
+//     },
+//   });
+// }

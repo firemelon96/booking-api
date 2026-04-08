@@ -1,34 +1,103 @@
 import { prisma } from '../config/prisma';
+import { getTourOrThrow } from '../utils/helper';
+import { UpdateItineraryInput } from '../validators/itinerary.schema';
 
-export async function addItinerary(params: {
-  tourId: string;
-  title: string;
-  activities: string[];
-  destinations: string[];
-}) {
-  const tour = await prisma.tour.findUnique({ where: { id: params.tourId } });
+// export async function addItinerary(params: {
+//   tourId: string;
+//   days: {
+//     dayNumber: number;
+//     title: string;
+//     items: {
+//       time: string;
+//       title: string;
+//       description: string;
+//       order: number;
+//     }[];
+//   }[];
+// }) {
+//   await getTourOrThrow(params.tourId);
 
-  if (!tour) {
-    throw new Error('Tour not found');
-  }
+//   return prisma.itinerary.create({
+//     data: {
+//       tourId: params.tourId,
+//       days: {
+//         create: params.days.map((day) => ({
+//           dayNumber: day.dayNumber,
+//           title: day.title,
+//           items: {
+//             create: day.items.map((item) => ({
+//               time: item.time,
+//             })),
+//           },
+//         })),
+//       },
+//     },
+//   });
+// }
 
-  const existing = await prisma.itinerary.findFirst({
-    where: {
-      tourId: params.tourId,
-      title: params.title,
-    },
-  });
+export async function updateItinerary(
+  tourId: string,
+  itinerary: UpdateItineraryInput,
+) {
+  return prisma.$transaction(async (tx) => {
+    const existingItinerary = await tx.itinerary.findUnique({
+      where: { tourId },
+      include: {
+        days: {
+          include: {
+            items: true,
+          },
+        },
+      },
+    });
 
-  if (existing) {
-    throw new Error('Itinerary with this title already exists for this tour');
-  }
+    if (!existingItinerary) {
+      throw new Error('Itinerary not found');
+    }
 
-  return prisma.itinerary.create({
-    data: {
-      tourId: params.tourId,
-      activities: params.activities,
-      destinations: params.destinations,
-      title: params.title,
-    },
+    // Delete existing itinerary
+    await tx.itineraryItem.deleteMany({
+      where: {
+        day: {
+          itineraryId: existingItinerary.id,
+        },
+      },
+    });
+
+    await tx.itineraryDay.deleteMany({
+      where: {
+        itineraryId: existingItinerary.id,
+      },
+    });
+
+    await tx.itinerary.update({
+      where: {
+        id: existingItinerary.id,
+      },
+      data: {
+        days: {
+          create: itinerary.days.map((day) => ({
+            dayNumber: day.dayNumber,
+            title: day.title,
+            items: {
+              create: day.items.map((item, index) => ({
+                time: item.time,
+                title: item.title,
+                description: item.description,
+                order: index,
+              })),
+            },
+          })),
+        },
+      },
+      include: {
+        days: {
+          orderBy: { dayNumber: 'asc' },
+          include: {
+            items: { orderBy: { order: 'asc' } },
+          },
+        },
+      },
+    });
   });
 }

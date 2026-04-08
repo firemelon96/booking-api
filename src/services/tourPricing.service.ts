@@ -116,9 +116,9 @@ export async function updateTourPricing(params: {
   return prisma.tourPricing.update({
     where: { id: params.pricingId },
     data: {
-      pricingType: params.pricingType,
-      minGroupSize: params.minGroupSize,
-      maxGroupSize: params.maxGroupSize,
+      pricingType: nextPricingType,
+      minGroupSize: nextMin,
+      maxGroupSize: nextMax,
       price: params.price,
       isGroupPrice: params.isGroupPrice,
     },

@@ -25,6 +25,7 @@ model User {
   profileImage  Image? @relation("UserProfileImage",fields: [profileImageId], references: [id])
 
   bookings Booking[]
+  reviews   Review[]
 }
 
 model Tour {
@@ -43,10 +44,11 @@ model Tour {
   timezone  String @default("Asia/Manila") 
 
   schedules   TourScheduleOption[] //For package tours, this will be empty and the schedule will be determined by the itinerary.
+  itinerary Itinerary?
   images  Image[]
   pricing TourPricing[]
   bookings Booking[]
-  itineraries Itinerary[]
+  reviews Review[]
 
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
@@ -68,7 +70,7 @@ model Itinerary {
   id      String      @id @default(uuid())
   days    ItineraryDay[]
 
-  tourId  String
+  tourId  String  @unique
   tour    Tour        @relation(fields: [tourId], references: [id], onDelete: Cascade)
 
   createdAt DateTime    @default(now())
@@ -139,6 +141,7 @@ model Booking {
 
   pricingType PricingType
   participants Int
+  notes       String?
 
   totalPrice     Float
   status         BookingStatus @default(PENDING)
@@ -148,7 +151,7 @@ model Booking {
 
   scheduleId String? //For package tours, this will be null and the schedule will be determined by the itinerary.
 
-  payments Payment?
+  payment Payment?
   
   user User @relation(fields: [userId], references: [id], onDelete: Restrict)
   tour Tour @relation(fields: [tourId], references: [id], onDelete: Restrict)
@@ -170,6 +173,84 @@ model Payment {
   status      PaymentStatus @default(PENDING)
 
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+}
+
+model Review {
+  id    String @id @default(uuid())
+  starRating  Int
+  comment     String
+  // imageIds    String[]
+
+  userId    String
+  tourId    String
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tour    Tour    @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+}
+
+model Hotel {
+  id        String @id  @default(uuid())
+  name      String  @unique
+  address   String
+  description String
+  amenities String[]
+
+  rooms     Room[]
+  policies  Policy[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Room {
+  id        String @id  @default(uuid())
+  name      String  @unique
+  description String
+  baseRate  Float
+  maxOccupancy  Int
+  roomType  RoomType
+  bedType BedType
+  extraPersonRate Int
+
+  hotelId   String
+
+  hotel   Hotel @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
+
+model Policy {
+  id        String @id @default(uuid())
+  checkIn   String
+  checkOut  String
+  cancellation  String
+  child     String
+  reservation String
+  pet String
+
+  hotelId String
+
+  hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum RoomType {
+  STUDIO
+  ENTIRE_HOUSE
+  LUXURY
+  FAMILY
+}
+
+enum BedType {
+  DOUBLE
+  KING
+  QUEEN
 }
 
 enum TourType {

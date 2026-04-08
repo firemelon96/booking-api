@@ -16,6 +16,8 @@ export async function uploadImage(req: Request, res: Response) {
       throw new Error('No files uploaded');
     }
 
+    //[{url:string, publicId: string}]
+
     // const images = files.map((file) => ({
     //   url: file.path,
     //   public_id: file.filename,
