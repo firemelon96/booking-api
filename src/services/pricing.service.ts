@@ -1,14 +1,16 @@
 import { prisma } from '../config/prisma';
+import { Prisma } from '../generated/prisma/client';
 import { PricingType } from '../types/pricing-type';
 
 export async function calculateTotalPrice(params: {
+  tx: Prisma.TransactionClient;
   tourId: string;
   pricingType: PricingType;
   participants: number;
 }) {
   const { tourId, pricingType, participants } = params;
 
-  const prices = await prisma.tourPricing.findMany({
+  const prices = await params.tx.tourPricing.findMany({
     where: {
       tourId,
       pricingType,

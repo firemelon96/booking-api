@@ -10,6 +10,7 @@ export const createBookingSchema = z
     endDate: z.iso.datetime().optional(),
     scheduleId: z.string().optional(),
     notes: z.string().optional(),
+    type: z.enum(['DAY', 'PACKAGE']).optional(),
   })
   .refine(
     (d) => {
@@ -23,11 +24,30 @@ export const createBookingSchema = z
   )
   .refine(
     (d) => {
-      if (d.pricingType === 'JOINER') return !d.endDate;
+      if (d.type === 'DAY') return !d.endDate;
       return true;
     },
     {
-      message: 'Joiner bookings must be single-day (no end date).',
+      message: 'Day bookings must be single-day (no end date).',
+      path: ['endDate'],
+    },
+  );
+
+export const rescheduleBookingSchema = z
+  .object({
+    newStartDate: z.iso.datetime(),
+    newEndDate: z.iso.datetime().optional(),
+    newScheduleId: z.string().optional(),
+  })
+  .refine(
+    (d) => {
+      if (!d.newEndDate) return true;
+      return (
+        new Date(d.newEndDate).getTime() >= new Date(d.newStartDate).getTime()
+      );
+    },
+    {
+      message: 'End date must be Greater than the start date',
       path: ['endDate'],
     },
   );

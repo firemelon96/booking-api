@@ -110,6 +110,7 @@ export async function listTours() {
           },
         },
       },
+      schedules: true,
     },
   });
 }

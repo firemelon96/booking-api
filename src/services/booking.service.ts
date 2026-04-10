@@ -1,14 +1,21 @@
-import { validate } from 'node-cron';
+import { schedule, validate } from 'node-cron';
 import { prisma } from '../config/prisma';
 import {
+  getDaysDiff,
   getExistingBookings,
   getTourOrThrow,
   normalizeInterval,
-  overlaps,
   validateAvailability,
 } from '../utils/helper';
 import { calculateTotalPrice } from './pricing.service';
-import { eachDayOfInterval } from 'date-fns';
+import { get } from 'lodash';
+import {
+  COOLDOWN_HOURS,
+  LOCK_HOURS,
+  MAX_RESCHEDULES,
+  MAX_SCHEDULE_DAYS,
+} from '../constant/constant';
+import { startOfDay } from 'date-fns';
 
 export async function createBooking(params: {
   userId: string;
@@ -24,85 +31,91 @@ export async function createBooking(params: {
 
   const tour = await getTourOrThrow(tourId);
 
-  const requestedInterval = normalizeInterval(params.startDate, params.endDate);
+  if (tour.types === 'DAY' && params.endDate) {
+    throw new Error('Day tours cannot have an end date.');
+  }
 
-  const existingBookings = await getExistingBookings(tourId, requestedInterval);
+  if (tour.types === 'DAY' && !params.scheduleId) {
+    throw new Error('Day tours require a schedule option to be selected.');
+  }
 
-  validateAvailability(
-    pricingType,
-    existingBookings,
-    requestedInterval,
-    tour.joinerCapacity,
-    participants,
-  );
+  if (tour.types === 'PACKAGE' && !params.endDate) {
+    throw new Error('Package tours require an end date.');
+  }
 
-  // if (pricingType === 'PRIVATE') {
-  //   const conflict = existingBookings.find((b) =>
-  //     overlaps(b.interval, requestedInterval),
-  //   );
-  //   if (conflict) {
-  //     throw new Error(
-  //       'Date not available: private booking requires exclusive availability.',
-  //     );
-  //   }
-  // }
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "Tour" WHERE id = ${tourId} FOR UPDATE`;
 
-  // if (pricingType === 'JOINER') {
-  //   const days = eachDayOfInterval(requestedInterval);
+    const requestedInterval = normalizeInterval(
+      params.startDate,
+      params.endDate,
+    );
 
-  //   for (const day of days) {
-  //     const dayInterval = normalizeInterval(day, day);
+    const existingBookings = await getExistingBookings(
+      tx,
+      tourId,
+      requestedInterval,
+    );
 
-  //     const privateConflict = existingBookings.find(
-  //       (b) => b.pricingType === 'PRIVATE' && overlaps(b.interval, dayInterval),
-  //     );
+    if (params.scheduleId) {
+      const schedule = await tx.tourScheduleOption.findFirst({
+        where: {
+          id: params.scheduleId,
+          tourId,
+        },
+      });
 
-  //     if (privateConflict) {
-  //       throw new Error(
-  //         'Date not available: private booking exists on the selected date.',
-  //       );
-  //     }
+      if (!schedule) {
+        throw new Error('Invalid schedule selected');
+      }
+    }
 
-  //     const used = existingBookings.reduce((sum, b) => {
-  //       if (b.pricingType !== 'JOINER') return sum;
-  //       return overlaps(b.interval, dayInterval) ? sum + b.participants : sum;
-  //     }, 0);
+    validateAvailability(
+      pricingType,
+      existingBookings,
+      requestedInterval,
+      tour.joinerCapacity,
+      participants,
+    );
 
-  //     if (used + participants > tour.joinerCapacity) {
-  //       const dayStr = day.toISOString().slice(0, 10);
-  //       throw new Error(
-  //         `Capacity exceeded for ${dayStr}: ${used}/${tour.joinerCapacity} already booked.`,
-  //       );
-  //     }
-  //   }
-  // }
-
-  const pricing = await calculateTotalPrice({
-    tourId,
-    pricingType,
-    participants,
-  });
-
-  const booking = await prisma.booking.create({
-    data: {
-      userId,
+    const pricing = await calculateTotalPrice({
+      tx,
       tourId,
       pricingType,
       participants,
-      totalPrice: pricing.totalPrice,
-      startDate: requestedInterval.start,
-      endDate: params.endDate ? requestedInterval.end : null,
-      scheduleId: params.scheduleId || null,
-      notes: params.notes || null,
-    },
-    include: {
-      tour: {
-        select: { id: true, joinerCapacity: true, name: true, slug: true },
-      },
-    },
-  });
+    });
 
-  return booking;
+    const booking = await tx.booking.create({
+      data: {
+        userId,
+        tourId,
+        pricingType,
+        participants,
+        totalPrice: pricing.totalPrice,
+        startDate: requestedInterval.start,
+        endDate: params.endDate ? requestedInterval.end : null,
+        scheduleId: params.scheduleId || null,
+        notes: params.notes || null,
+      },
+      include: {
+        tour: {
+          select: { id: true, joinerCapacity: true, name: true, slug: true },
+        },
+      },
+    });
+
+    await tx.bookingAuditLog.create({
+      data: {
+        bookingId: booking.id,
+        actorId: userId,
+        actorType: 'USER',
+        action: 'CREATED',
+        newValue: booking,
+      },
+    });
+
+    return booking;
+  });
 }
 
 export async function listMyBookings(userId: string) {
@@ -183,9 +196,167 @@ export async function adminCancelBooking(bookingId: string) {
   });
 }
 
-// export async function rescheduleBooking(
+export async function rescheduleExistingBooking(data: {
+  bookingId: string;
+  userId: string;
+  newStartDate: Date;
+  newEndDate?: Date | null;
+  newScheduleId?: string | null;
+}) {
+  const normalizedStart = startOfDay(data.newStartDate);
+  const normalizedEnd = data.newEndDate ? startOfDay(data.newEndDate) : null;
+
+  if (normalizedStart < startOfDay(new Date())) {
+    throw new Error('Cannot reschedule to a past date.');
+  }
+
+  if (normalizedEnd && normalizedEnd < normalizedStart) {
+    throw new Error('End date must be greater than start date.');
+  }
+
+  const booking = await prisma.booking.findUnique({
+    where: { id: data.bookingId },
+    include: {
+      tour: {
+        select: { id: true, joinerCapacity: true },
+      },
+    },
+  });
+
+  if (!booking) {
+    throw new Error('Booking not found');
+  }
+
+  if (data.newScheduleId) {
+    const schedule = await prisma.tourScheduleOption.findFirst({
+      where: { tourId: booking?.tour?.id, id: data.newScheduleId },
+    });
+
+    if (!schedule) {
+      throw new Error('Invalid schedule option for this tour.');
+    }
+  }
+
+  if (booking.userId !== data.userId) {
+    throw new Error('Unauthorized to reschedule this booking');
+  }
+
+  if (booking.status !== 'CONFIRMED') {
+    throw new Error('Only confirmed bookings can be rescheduled');
+  }
+
+  const originalDays = getDaysDiff(booking.startDate, booking.endDate);
+  const newDays = getDaysDiff(data.newStartDate, data.newEndDate);
+
+  if (originalDays === 1 && data.newEndDate) {
+    throw new Error('Day bookings cannot have an end date.');
+  }
+
+  //allowed duration only
+  if (newDays !== originalDays) {
+    throw new Error(
+      'Rescheduling must maintain the same duration as the original booking.',
+    );
+  }
+
+  const maxAllowableDate = new Date(booking.startDate);
+  maxAllowableDate.setDate(maxAllowableDate.getDate() + MAX_SCHEDULE_DAYS);
+
+  if (startOfDay(data.newStartDate) > startOfDay(maxAllowableDate)) {
+    throw new Error(
+      `Rescheduling can only be done within ${MAX_SCHEDULE_DAYS} days of the original date.`,
+    );
+  }
+
+  const maxReschedulesReached = booking.rescheduleCount >= MAX_RESCHEDULES;
+
+  if (maxReschedulesReached) {
+    throw new Error(
+      `Maximum reschedule limit of ${MAX_RESCHEDULES} reached for this booking.`,
+    );
+  }
+
+  if (booking.lastRescheduleDate) {
+    const hoursSinceLastReschedule =
+      (Date.now() - booking.lastRescheduleDate.getTime()) / (1000 * 60 * 60);
+    if (hoursSinceLastReschedule < COOLDOWN_HOURS) {
+      throw new Error(
+        `You must wait at least ${COOLDOWN_HOURS} hours between reschedules. Please try again later.`,
+      );
+    }
+  }
+
+  const hoursDiff =
+    (booking.startDate.getTime() - Date.now()) / (1000 * 60 * 60);
+
+  if (hoursDiff < LOCK_HOURS) {
+    throw new Error(
+      `Reschedule is not allowed within ${LOCK_HOURS} hours of the booking start time.`,
+    );
+  }
+
+  const requestedInterval = normalizeInterval(
+    data.newStartDate,
+    data.newEndDate,
+  );
+
+  return prisma.$transaction(async (tx) => {
+    const existingBookings = await getExistingBookings(
+      tx,
+      booking.tourId,
+      requestedInterval,
+      booking.id, // exclude current booking from conflict check
+    );
+
+    validateAvailability(
+      booking.pricingType,
+      existingBookings,
+      requestedInterval,
+      booking.tour.joinerCapacity ?? 0,
+      booking.participants,
+    );
+
+    const updatedBooking = await tx.booking.update({
+      where: { id: data.bookingId },
+      data: {
+        startDate: requestedInterval.start,
+        endDate: data.newEndDate ? requestedInterval.end : null,
+        rescheduleCount: booking.rescheduleCount + 1,
+        lastRescheduleDate: new Date(),
+        scheduleId: data.newScheduleId || booking.scheduleId,
+      },
+      include: {
+        tour: {
+          select: { id: true, name: true, slug: true },
+        },
+      },
+    });
+
+    await tx.bookingAuditLog.create({
+      data: {
+        bookingId: booking.id,
+        actorId: data.userId,
+        actorType: 'USER',
+        action: 'RESCHEDULED',
+        previousValue: {
+          startDate: booking.startDate,
+          endDate: booking.endDate,
+          scheduleId: booking.scheduleId,
+        },
+        newValue: {
+          startDate: updatedBooking.startDate,
+          endDate: updatedBooking.endDate,
+          scheduleId: updatedBooking.scheduleId,
+        },
+      },
+    });
+
+    return updatedBooking;
+  });
+}
+
+// export async function adminRescheduleBooking(
 //   bookingId: string,
-//   userId: string,
 //   newStartDate: Date,
 //   newEndDate?: Date | null,
 // ) {
@@ -195,10 +366,6 @@ export async function adminCancelBooking(bookingId: string) {
 
 //   if (!booking) {
 //     throw new Error('Booking not found');
-//   }
-
-//   if (booking.userId !== userId) {
-//     throw new Error('Unauthorized to reschedule this booking');
 //   }
 
 //   const tour = await getTourOrThrow(booking.tourId);
@@ -225,5 +392,37 @@ export async function adminCancelBooking(bookingId: string) {
 //       startDate: requestedInterval.start,
 //       endDate: newEndDate ? requestedInterval.end : null,
 //     },
+//     include: {
+//       tour: {
+//         select: {
+//           id: true,
+//           name: true,
+//           slug: true,
+//           pricing: {
+//             select: { price: true },
+//           },
+//         },
+//       },
+//     },
 //   });
 // }
+
+export async function getBookingById(bookingId: string) {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: {
+      tour: {
+        select: { id: true, name: true, slug: true },
+      },
+      user: {
+        select: { name: true, email: true },
+      },
+    },
+  });
+
+  if (!booking) {
+    throw new Error('Booking not found');
+  }
+
+  return booking;
+}

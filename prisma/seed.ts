@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
 import { prisma } from '../src/config/prisma';
-import { PricingType, Role } from '../src/generated/prisma/enums';
+import { PricingType, Role, TourSchedule } from '../src/generated/prisma/enums';
 
 async function main() {
   console.log('🌱 Seeding database...');
@@ -79,11 +79,17 @@ async function main() {
     ],
   });
 
-  await prisma.tourScheduleOption.create({
-    data: {
-      tourId: dayTour.id,
-      schedule: 'MORNING',
-    },
+  await prisma.tourScheduleOption.createMany({
+    data: [
+      {
+        tourId: dayTour.id,
+        schedule: 'MORNING',
+      },
+      {
+        tourId: dayTour.id,
+        schedule: 'AFTERNOON',
+      },
+    ],
   });
 
   await prisma.itinerary.create({
@@ -133,6 +139,7 @@ async function main() {
       ],
       exclusions: ['Personal expenses', 'Gratuities'],
       location: 'Puerto Princesa, Palawan',
+      types: 'PACKAGE',
     },
   });
 
@@ -225,18 +232,6 @@ async function main() {
         isGroupPrice: true,
       },
     ],
-  });
-
-  // Booking (snapshot example)
-  await prisma.booking.create({
-    data: {
-      userId: user.id,
-      tourId: tour.id,
-      totalPrice: 5000,
-      startDate: new Date('2026-04-10T08:00:00Z'),
-      pricingType: PricingType.JOINER,
-      participants: 3,
-    },
   });
 
   console.log('✅ Seed completed');

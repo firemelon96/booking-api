@@ -1,10 +1,17 @@
 import {
   areIntervalsOverlapping,
+  differenceInCalendarDays,
   eachDayOfInterval,
-  Interval,
   startOfDay,
 } from 'date-fns';
 import { prisma } from '../config/prisma';
+import { Prisma } from '../generated/prisma/client';
+
+export function getDaysDiff(start: Date, end?: Date | null) {
+  if (!end) return 1;
+
+  return differenceInCalendarDays(startOfDay(end), startOfDay(start)) + 1;
+}
 
 export function normalizeInterval(start: Date, end?: Date | null) {
   const s = startOfDay(start);
@@ -22,7 +29,7 @@ export function overlaps(
 export async function getTourOrThrow(tourId: string) {
   const tour = await prisma.tour.findUnique({
     where: { id: tourId },
-    select: { id: true, joinerCapacity: true, pricing: true },
+    select: { id: true, joinerCapacity: true, pricing: true, types: true },
   });
 
   if (!tour) throw new Error('Tour not found');
@@ -30,12 +37,21 @@ export async function getTourOrThrow(tourId: string) {
 }
 
 export async function getExistingBookings(
+  tx: Prisma.TransactionClient,
   tourId: string,
   requested: { start: Date; end: Date },
+  bookingIdToExclude?: string,
 ) {
-  const existingBookings = await prisma.booking.findMany({
+  const existingBookings = await tx.booking.findMany({
     where: {
       tourId,
+      NOT: bookingIdToExclude
+        ? [
+            { id: bookingIdToExclude },
+            { status: 'CANCELLED' },
+            { status: 'PENDING' },
+          ]
+        : undefined,
       OR: [
         {
           endDate: { not: null, gte: requested.start },
@@ -53,6 +69,7 @@ export async function getExistingBookings(
       participants: true,
       startDate: true,
       endDate: true,
+      schedule: true,
     },
   });
 
