@@ -99,6 +99,7 @@ export async function rescheduleBooking(req: Request, res: Response) {
       newStartDate: new Date(body.newStartDate),
       newEndDate: body.newEndDate ? new Date(body.newEndDate) : null,
       newScheduleId: body.newScheduleId || null,
+      reason: body.reason ?? null,
     });
 
     return res.json(updatedBooking);

@@ -38,6 +38,7 @@ export const rescheduleBookingSchema = z
     newStartDate: z.iso.datetime(),
     newEndDate: z.iso.datetime().optional(),
     newScheduleId: z.string().optional(),
+    reason: z.string().optional(),
   })
   .refine(
     (d) => {

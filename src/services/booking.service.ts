@@ -202,24 +202,17 @@ export async function rescheduleExistingBooking(data: {
   newStartDate: Date;
   newEndDate?: Date | null;
   newScheduleId?: string | null;
+  reason?: string | null;
 }) {
-  const normalizedStart = startOfDay(data.newStartDate);
-  const normalizedEnd = data.newEndDate ? startOfDay(data.newEndDate) : null;
-
-  if (normalizedStart < startOfDay(new Date())) {
-    throw new Error('Cannot reschedule to a past date.');
-  }
-
-  if (normalizedEnd && normalizedEnd < normalizedStart) {
-    throw new Error('End date must be greater than start date.');
-  }
+  const requestedInterval = normalizeInterval(
+    data.newStartDate,
+    data.newEndDate,
+  );
 
   const booking = await prisma.booking.findUnique({
     where: { id: data.bookingId },
     include: {
-      tour: {
-        select: { id: true, joinerCapacity: true },
-      },
+      tour: { select: { id: true, joinerCapacity: true } },
     },
   });
 
@@ -227,14 +220,24 @@ export async function rescheduleExistingBooking(data: {
     throw new Error('Booking not found');
   }
 
-  if (data.newScheduleId) {
-    const schedule = await prisma.tourScheduleOption.findFirst({
-      where: { tourId: booking?.tour?.id, id: data.newScheduleId },
-    });
+  const maxReschedulesReached = booking.rescheduleCount >= MAX_RESCHEDULES;
 
-    if (!schedule) {
-      throw new Error('Invalid schedule option for this tour.');
-    }
+  if (maxReschedulesReached) {
+    throw new Error(
+      `Maximum reschedule limit of ${MAX_RESCHEDULES} reached for this booking.`,
+    );
+  }
+
+  if (
+    booking.startDate.getTime() === requestedInterval.start.getTime() &&
+    (booking.endDate?.getTime() ?? null) ===
+      (requestedInterval.end?.getTime() ?? null)
+  ) {
+    throw new Error('No changes detected');
+  }
+
+  if (booking.scheduleId && !data.newScheduleId) {
+    throw new Error('Schedule option is required for this booking');
   }
 
   if (booking.userId !== data.userId) {
@@ -252,10 +255,28 @@ export async function rescheduleExistingBooking(data: {
     throw new Error('Day bookings cannot have an end date.');
   }
 
+  if (originalDays > 1 && !data.newEndDate) {
+    throw new Error('Multi-day bookings require an end date.');
+  }
+
+  if (originalDays > 1 && data.newScheduleId) {
+    throw new Error('Schedule options are only valid for day bookings.');
+  }
+
+  if (data.newScheduleId) {
+    const schedule = await prisma.tourScheduleOption.findFirst({
+      where: { tourId: booking.tourId, id: data.newScheduleId },
+    });
+
+    if (!schedule) {
+      throw new Error('Invalid schedule option for this tour.');
+    }
+  }
+
   //allowed duration only
   if (newDays !== originalDays) {
     throw new Error(
-      'Rescheduling must maintain the same duration as the original booking.',
+      `Rescheduling must maintain the same ${originalDays} days duration as the original booking.`,
     );
   }
 
@@ -265,14 +286,6 @@ export async function rescheduleExistingBooking(data: {
   if (startOfDay(data.newStartDate) > startOfDay(maxAllowableDate)) {
     throw new Error(
       `Rescheduling can only be done within ${MAX_SCHEDULE_DAYS} days of the original date.`,
-    );
-  }
-
-  const maxReschedulesReached = booking.rescheduleCount >= MAX_RESCHEDULES;
-
-  if (maxReschedulesReached) {
-    throw new Error(
-      `Maximum reschedule limit of ${MAX_RESCHEDULES} reached for this booking.`,
     );
   }
 
@@ -295,12 +308,9 @@ export async function rescheduleExistingBooking(data: {
     );
   }
 
-  const requestedInterval = normalizeInterval(
-    data.newStartDate,
-    data.newEndDate,
-  );
-
   return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "Tour" WHERE id = ${booking.tourId} FOR UPDATE`;
+
     const existingBookings = await getExistingBookings(
       tx,
       booking.tourId,
@@ -316,6 +326,8 @@ export async function rescheduleExistingBooking(data: {
       booking.participants,
     );
 
+    //we are not going to change the participants number and recalculate because its already paid when confirmed
+
     const updatedBooking = await tx.booking.update({
       where: { id: data.bookingId },
       data: {
@@ -323,7 +335,7 @@ export async function rescheduleExistingBooking(data: {
         endDate: data.newEndDate ? requestedInterval.end : null,
         rescheduleCount: booking.rescheduleCount + 1,
         lastRescheduleDate: new Date(),
-        scheduleId: data.newScheduleId || booking.scheduleId,
+        scheduleId: data.newScheduleId ?? booking.scheduleId,
       },
       include: {
         tour: {
@@ -338,6 +350,7 @@ export async function rescheduleExistingBooking(data: {
         actorId: data.userId,
         actorType: 'USER',
         action: 'RESCHEDULED',
+        reason: data.reason ?? null,
         previousValue: {
           startDate: booking.startDate,
           endDate: booking.endDate,
