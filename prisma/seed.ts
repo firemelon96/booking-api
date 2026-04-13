@@ -1,6 +1,11 @@
 import bcrypt from 'bcrypt';
 import { prisma } from '../src/config/prisma';
-import { PricingType, Role, TourSchedule } from '../src/generated/prisma/enums';
+import {
+  PricingModel,
+  PricingType,
+  Role,
+  TourSchedule,
+} from '../src/generated/prisma/enums';
 
 async function main() {
   console.log('🌱 Seeding database...');
@@ -58,7 +63,7 @@ async function main() {
         minGroupSize: 1,
         maxGroupSize: 10,
         price: 1500,
-        isGroupPrice: false,
+        pricingModel: PricingModel.PER_PERSON,
       },
       {
         tourId: dayTour.id,
@@ -66,7 +71,7 @@ async function main() {
         minGroupSize: 1,
         maxGroupSize: 2,
         price: 4000,
-        isGroupPrice: false,
+        pricingModel: PricingModel.PER_GROUP,
       },
       {
         tourId: dayTour.id,
@@ -74,7 +79,7 @@ async function main() {
         minGroupSize: 3,
         maxGroupSize: 5,
         price: 7000,
-        isGroupPrice: false,
+        pricingModel: PricingModel.PER_GROUP,
       },
     ],
   });
@@ -82,12 +87,14 @@ async function main() {
   await prisma.tourScheduleOption.createMany({
     data: [
       {
+        label: 'Morning',
         tourId: dayTour.id,
-        schedule: 'MORNING',
+        startTIme: '8:00 AM',
       },
       {
+        label: 'Afternoon',
         tourId: dayTour.id,
-        schedule: 'AFTERNOON',
+        startTIme: '1:00 PM',
       },
     ],
   });
@@ -139,7 +146,7 @@ async function main() {
       ],
       exclusions: ['Personal expenses', 'Gratuities'],
       location: 'Puerto Princesa, Palawan',
-      types: 'PACKAGE',
+      type: 'PACKAGE',
     },
   });
 
@@ -213,7 +220,7 @@ async function main() {
         minGroupSize: 1,
         maxGroupSize: 10,
         price: 2000,
-        isGroupPrice: false,
+        pricingModel: PricingModel.PER_PERSON,
       },
       {
         tourId: tour.id,
@@ -221,7 +228,7 @@ async function main() {
         minGroupSize: 1,
         maxGroupSize: 2,
         price: 5000,
-        isGroupPrice: true,
+        pricingModel: PricingModel.PER_GROUP,
       },
       {
         tourId: tour.id,
@@ -229,7 +236,7 @@ async function main() {
         minGroupSize: 3,
         maxGroupSize: 5,
         price: 8000,
-        isGroupPrice: true,
+        pricingModel: PricingModel.PER_GROUP,
       },
     ],
   });

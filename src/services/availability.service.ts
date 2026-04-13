@@ -1,7 +1,9 @@
 import { prisma } from '../config/prisma';
-import { parseISO, eachDayOfInterval } from 'date-fns';
+import { parseISO, eachDayOfInterval, startOfDay } from 'date-fns';
 import { normalizeInterval, overlaps } from '../utils/helper';
 import { PricingType } from '../types/pricing-type';
+import { Prisma, Tour } from '../generated/prisma/client';
+import { getRows, increment, lock } from './capacity.service';
 
 function dayKey(d: Date) {
   return d.toISOString().slice(0, 10);
@@ -77,4 +79,154 @@ export async function getTourAvailability(params: {
   });
 
   return availability;
+}
+
+export async function reserve({
+  tx,
+  tourId,
+  interval,
+  excludeBookingId,
+  scheduleId,
+  capacityMode,
+  participants,
+  pricingType,
+}: {
+  tx: Prisma.TransactionClient;
+  tourId: string;
+  interval: { start: Date; end: Date };
+  excludeBookingId?: string | null;
+  scheduleId?: string | null;
+  capacityMode: 'EXCLUSIVE' | 'SHARED' | 'MIXED';
+  pricingType: 'PRIVATE' | 'JOINER';
+  participants: number;
+}) {
+  await lock({ tx, tourId, interval });
+
+  await checkClosedDates({ tx, tourId, interval });
+
+  if (capacityMode === 'EXCLUSIVE') {
+    return checkExclusive({
+      tx,
+      tourId,
+      interval,
+      excludeBookingId,
+      scheduleId: scheduleId ?? null,
+    });
+  }
+
+  if (capacityMode === 'SHARED') {
+    return checkShared({
+      tx,
+      tourId,
+      interval,
+      participants,
+      scheduleId,
+      excludeBookingId,
+    });
+  }
+
+  if (capacityMode === 'MIXED') {
+    if (pricingType === 'PRIVATE') {
+      return checkExclusive({
+        tx,
+        tourId,
+        interval,
+        excludeBookingId,
+        scheduleId: scheduleId ?? null,
+      });
+    }
+
+    if (pricingType === 'JOINER') {
+      return checkShared({
+        tx,
+        tourId,
+        interval,
+        participants,
+        scheduleId,
+        excludeBookingId,
+      });
+    }
+  }
+}
+
+async function checkClosedDates({
+  tx,
+  tourId,
+  interval,
+}: {
+  tx: Prisma.TransactionClient;
+  tourId: string;
+  interval: { start: Date; end: Date };
+}) {
+  const closed = await tx.tourAvailability.findFirst({
+    where: {
+      tourId,
+      date: {
+        gte: interval.start,
+        lte: interval.end,
+      },
+    },
+  });
+
+  if (closed) throw new Error('Date is closed.');
+}
+
+async function checkExclusive({
+  tx,
+  tourId,
+  interval,
+  excludeBookingId,
+  scheduleId,
+}: {
+  tx: Prisma.TransactionClient;
+  tourId: string;
+  interval: { start: Date; end: Date };
+  excludeBookingId?: string | null;
+  scheduleId: string | null;
+}) {
+  const conflict = await tx.booking.findFirst({
+    where: {
+      tourId,
+      status: { in: ['PENDING', 'CONFIRMED'] },
+      ...(excludeBookingId && { NOT: { id: excludeBookingId } }),
+      startDate: { lte: interval.end },
+      endDate: { gte: interval.start },
+    },
+  });
+
+  if (conflict) throw new Error('Dates are already booked (exclusive mode)');
+}
+
+async function checkShared({
+  tx,
+  tourId,
+  interval,
+  participants,
+  scheduleId,
+  excludeBookingId,
+}: {
+  tx: Prisma.TransactionClient;
+  tourId: string;
+  interval: { start: Date; end: Date };
+  participants: number;
+  scheduleId?: string | null;
+  excludeBookingId?: string | null;
+}) {
+  const days = eachDayOfInterval(interval);
+
+  const rows = await getRows({ tx, tourId, interval, scheduleId });
+
+  const map = new Map(rows.map((r) => [r.date.getTime(), r]));
+
+  for (const day of days) {
+    const row = map.get(startOfDay(day).getTime());
+
+    if (!row) throw new Error('Capacity not initialized');
+
+    if (row.booked + participants > row.capacity) {
+      throw new Error(`Capacity exceeded on ${day.toISOString()}`);
+    }
+  }
+
+  await increment({ tx, rows, participants });
 }

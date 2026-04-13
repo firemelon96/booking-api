@@ -2,46 +2,39 @@ import { prisma } from '../config/prisma';
 import { Prisma } from '../generated/prisma/client';
 import { PricingType } from '../types/pricing-type';
 
-export async function calculateTotalPrice(params: {
+export async function calculate({
+  tx,
+  tourId,
+  pricingType,
+  participants,
+}: {
   tx: Prisma.TransactionClient;
   tourId: string;
-  pricingType: PricingType;
+  pricingType: 'JOINER' | 'PRIVATE';
   participants: number;
 }) {
-  const { tourId, pricingType, participants } = params;
-
-  const prices = await params.tx.tourPricing.findMany({
-    where: {
-      tourId,
-      pricingType,
-    },
-    orderBy: [{ minGroupSize: 'asc' }],
+  const pricingList = await tx.tourPricing.findMany({
+    where: { tourId, pricingType },
   });
 
-  if (!prices.length) {
-    throw new Error('No pricing for this tour and pricing type');
-  }
+  const pricing = pricingList.find((p) => {
+    if (!p.maxGroupSize && !p.maxGroupSize) return true;
 
-  const matched = prices.find(
-    (p) => participants >= p.minGroupSize && participants <= p.maxGroupSize,
-  );
-
-  if (!matched) {
-    const ranges = prices
-      .map((p) => `${p.minGroupSize}-${p.maxGroupSize}`)
-      .join(', ');
-    throw new Error(
-      `No matching price found for ${participants} participant(s). Supported ranges: ${ranges}`,
+    return (
+      participants >= (p.minGroupSize ?? 0) &&
+      participants <= (p.maxGroupSize ?? Infinity)
     );
+  });
+
+  if (!pricing) throw new Error('No pricing availanle for this group size');
+
+  if (pricing.pricingModel === 'PER_PERSON') {
+    return { totalPrice: pricing.price * participants };
   }
 
-  const totalPrice = matched.isGroupPrice
-    ? matched.price
-    : matched.price * participants;
+  if (pricing.pricingModel === 'PER_GROUP') {
+    return { totalPrice: pricing.price };
+  }
 
-  return {
-    matchedPricing: matched,
-    totalPrice,
-    currency: 'PHP',
-  };
+  throw new Error('Invalid pricing model');
 }

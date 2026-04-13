@@ -5,6 +5,7 @@ import {
 } from '../validators/booking.schema';
 import {
   createBooking,
+  createNewBooking,
   getBookingById,
   listAllBookings,
   listMyBookings,
@@ -13,21 +14,16 @@ import {
 
 export async function create(req: Request, res: Response) {
   try {
-    if (!req.user?.userId) {
+    const userId = req.user?.userId;
+    if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
     const body = createBookingSchema.parse(req.body);
 
-    const booking = await createBooking({
-      userId: req.user.userId,
-      tourId: body.tourId,
-      pricingType: body.pricingType,
-      startDate: new Date(body.startDate),
-      endDate: body.endDate ? new Date(body.endDate) : null,
-      participants: body.participants,
-      scheduleId: body.scheduleId || null,
-      notes: body.notes || null,
+    const booking = await createNewBooking({
+      ...body,
+      userId,
     });
 
     res.status(201).json(booking);

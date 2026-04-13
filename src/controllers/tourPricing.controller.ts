@@ -44,7 +44,7 @@ export async function create(req: Request, res: Response) {
       minGroupSize: body.minGroupSize,
       maxGroupSize: body.maxGroupSize,
       price: body.price,
-      isGroupPrice: body.isGroupPrice ?? false,
+      pricingModel: body.pricingModel,
     });
 
     res.status(201).json(created);

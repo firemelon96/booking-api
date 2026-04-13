@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PricingModel } from '../generated/prisma/enums';
 
 const pricingTypeEnum = z.enum(['JOINER', 'PRIVATE']);
 
@@ -8,7 +9,7 @@ export const createTourPricingSchema = z
     minGroupSize: z.number().int().min(1),
     maxGroupSize: z.number().int().min(1),
     price: z.number().int().min(0),
-    isGroupPrice: z.boolean().optional().default(false),
+    pricingModel: z.enum(PricingModel),
   })
   .refine((d) => d.minGroupSize <= d.maxGroupSize, {
     message: 'Min group size must be less than or equals max group size',

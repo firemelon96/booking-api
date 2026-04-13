@@ -1,13 +1,14 @@
 import { schedule, validate } from 'node-cron';
 import { prisma } from '../config/prisma';
 import {
+  buildInterval,
+  checkAvailability,
   getDaysDiff,
-  getExistingBookings,
   getTourOrThrow,
   normalizeInterval,
-  validateAvailability,
+  reserveCapacity,
 } from '../utils/helper';
-import { calculateTotalPrice } from './pricing.service';
+import { calculate, calculateTotalPrice } from './pricing.service';
 import { get } from 'lodash';
 import {
   COOLDOWN_HOURS,
@@ -16,126 +17,13 @@ import {
   MAX_SCHEDULE_DAYS,
 } from '../constant/constant';
 import { startOfDay } from 'date-fns';
-
-export async function createBooking(params: {
-  userId: string;
-  tourId: string;
-  pricingType: 'JOINER' | 'PRIVATE';
-  participants: number;
-  startDate: Date;
-  endDate?: Date | null;
-  scheduleId?: string | null;
-  notes?: string | null;
-}) {
-  const { userId, tourId, pricingType, participants } = params;
-
-  const tour = await getTourOrThrow(tourId);
-
-  if (tour.types === 'DAY' && params.endDate) {
-    throw new Error('Day tours cannot have an end date.');
-  }
-
-  if (tour.types === 'DAY' && !params.scheduleId) {
-    throw new Error('Day tours require a schedule option to be selected.');
-  }
-
-  if (tour.types === 'PACKAGE' && !params.endDate) {
-    throw new Error('Package tours require an end date.');
-  }
-
-  return prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM "Tour" WHERE id = ${tourId} FOR UPDATE`;
-
-    const requestedInterval = normalizeInterval(
-      params.startDate,
-      params.endDate,
-    );
-
-    const existingBookings = await getExistingBookings(
-      tx,
-      tourId,
-      requestedInterval,
-    );
-
-    if (params.scheduleId) {
-      const schedule = await tx.tourScheduleOption.findFirst({
-        where: {
-          id: params.scheduleId,
-          tourId,
-        },
-      });
-
-      if (!schedule) {
-        throw new Error('Invalid schedule selected');
-      }
-    }
-
-    validateAvailability(
-      pricingType,
-      existingBookings,
-      requestedInterval,
-      tour.joinerCapacity,
-      participants,
-    );
-
-    const pricing = await calculateTotalPrice({
-      tx,
-      tourId,
-      pricingType,
-      participants,
-    });
-
-    const booking = await tx.booking.create({
-      data: {
-        userId,
-        tourId,
-        pricingType,
-        participants,
-        totalPrice: pricing.totalPrice,
-        startDate: requestedInterval.start,
-        endDate: params.endDate ? requestedInterval.end : null,
-        scheduleId: params.scheduleId || null,
-        notes: params.notes || null,
-      },
-      include: {
-        tour: {
-          select: { id: true, joinerCapacity: true, name: true, slug: true },
-        },
-      },
-    });
-
-    await tx.bookingAuditLog.create({
-      data: {
-        bookingId: booking.id,
-        actorId: userId,
-        actorType: 'USER',
-        action: 'CREATED',
-        newValue: booking,
-      },
-    });
-
-    return booking;
-  });
-}
-
-export async function listMyBookings(userId: string) {
-  return prisma.booking.findMany({
-    where: { userId },
-    orderBy: { createdAt: 'desc' },
-    include: {
-      tour: {
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          pricing: {
-            select: { price: true },
-          },
-        },
-      },
-    },
-  });
-}
+import z from 'zod';
+import {
+  createBookingSchema,
+  rescheduleBookingSchema,
+} from '../validators/booking.schema';
+import { ensureRows } from './capacity.service';
+import { reserve } from './availability.service';
 
 export async function listAllBookings() {
   return prisma.booking.findMany({
@@ -164,37 +52,195 @@ export async function listAllBookings() {
   });
 }
 
-export async function cancelBooking(bookingId: string, userId: string) {
+export async function listMyBookings(userId: string) {
+  return prisma.booking.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      tour: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          pricing: {
+            select: { price: true },
+          },
+        },
+      },
+    },
+  });
+}
+
+export async function cancelBooking(params: {
+  bookingId: string;
+  userId: string;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const booking = await tx.booking.findUnique({
+      where: { id: params.bookingId },
+      include: {
+        tour: {
+          include: { cancellationPolicy: true },
+        },
+      },
+    });
+
+    if (booking?.userId !== params.userId) {
+      throw new Error('Unauthorized');
+    }
+
+    if (booking.status !== 'CONFIRMED') {
+      throw new Error('Only confirmed booking can be cancel.');
+    }
+  });
+}
+
+export async function getBookingById(bookingId: string) {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
+    include: {
+      tour: {
+        select: { id: true, name: true, slug: true },
+      },
+      user: {
+        select: { name: true, email: true },
+      },
+    },
   });
 
   if (!booking) {
     throw new Error('Booking not found');
   }
 
-  if (booking.userId !== userId) {
-    throw new Error('Unauthorized to cancel this booking');
-  }
-
-  return prisma.booking.delete({
-    where: { id: bookingId },
-  });
+  return booking;
 }
 
-export async function adminCancelBooking(bookingId: string) {
-  const booking = await prisma.booking.findUnique({
-    where: { id: bookingId },
-  });
+// export async function createBooking(params: {
+//   userId: string;
+//   tourId: string;
+//   pricingType: 'JOINER' | 'PRIVATE';
+//   participants: number;
+//   startDate: Date;
+//   endDate?: Date | null;
+//   scheduleId?: string | null;
+//   notes?: string | null;
+// }) {
+//   const {
+//     userId,
+//     tourId,
+//     pricingType,
+//     participants,
+//     scheduleId,
+//     notes,
+//     startDate,
+//     endDate,
+//   } = params;
 
-  if (!booking) {
-    throw new Error('Booking not found');
-  }
+//   const requestInterval = normalizeInterval(startDate, endDate);
 
-  return prisma.booking.delete({
-    where: { id: bookingId },
-  });
-}
+//   const tour = await getTourOrThrow(tourId);
+
+//   if (tour.types === 'DAY') {
+//     if (params.endDate) {
+//       throw new Error('Day tour does not require an end date.');
+//     }
+
+//     if (!scheduleId) {
+//       throw new Error('Schedule is required for this tour.');
+//     }
+
+//     const schedule = await prisma.tourScheduleOption.findFirst({
+//       where: {
+//         id: scheduleId,
+//         tourId,
+//       },
+//     });
+
+//     if (!schedule) {
+//       throw new Error('Invalid schedule selected');
+//     }
+//   }
+
+//   if (tour.types === 'PACKAGE') {
+//     if (scheduleId) {
+//       throw new Error('Package tour does not require schedule');
+//     }
+
+//     if (!params.endDate) {
+//       throw new Error('Package tours require an end date.');
+//     }
+
+//     if (requestInterval.start.getTime() === requestInterval.end.getTime()) {
+//       throw new Error('Start and end date cannot be the same.');
+//     }
+//   }
+
+//   return prisma.$transaction(async (tx) => {
+//     await tx.$queryRaw`SELECT * FROM "TourDailyCapacity"
+//     WHERE "tourId" = ${tourId}
+//     AND date BETWEEN ${requestInterval.start} AND ${requestInterval.end}
+//     FOR UPDATE`;
+
+//     await checkAvailability({
+//       tx,
+//       tourId,
+//       tourType: tour.types,
+//       pricingType,
+//       participants,
+//       requestInterval,
+//       scheduleId,
+//     });
+
+//     if (pricingType === 'JOINER') {
+//       await reserveCapacity({
+//         tx,
+//         tourId,
+//         requestInterval,
+//         participants,
+//         capacity: tour.joinerCapacity,
+//         scheduleId,
+//       });
+//     }
+
+//     const pricing = await calculateTotalPrice({
+//       tx,
+//       tourId,
+//       pricingType,
+//       participants,
+//     });
+
+//     const booking = await tx.booking.create({
+//       data: {
+//         userId,
+//         tourId,
+//         pricingType,
+//         participants,
+//         totalPrice: pricing.totalPrice,
+//         startDate: requestInterval.start,
+//         endDate: requestInterval.end ?? null,
+//         scheduleId: params.scheduleId || null,
+//         notes: params.notes || null,
+//       },
+//       include: {
+//         tour: {
+//           select: { id: true, joinerCapacity: true, name: true, slug: true },
+//         },
+//       },
+//     });
+
+//     await tx.bookingAuditLog.create({
+//       data: {
+//         bookingId: booking.id,
+//         actorId: userId,
+//         actorType: 'USER',
+//         action: 'CREATED',
+//         newValue: booking,
+//       },
+//     });
+
+//     return booking;
+//   });
+// }
 
 export async function rescheduleExistingBooking(data: {
   bookingId: string;
@@ -204,10 +250,7 @@ export async function rescheduleExistingBooking(data: {
   newScheduleId?: string | null;
   reason?: string | null;
 }) {
-  const requestedInterval = normalizeInterval(
-    data.newStartDate,
-    data.newEndDate,
-  );
+  const requestInterval = normalizeInterval(data.newStartDate, data.newEndDate);
 
   const booking = await prisma.booking.findUnique({
     where: { id: data.bookingId },
@@ -229,9 +272,9 @@ export async function rescheduleExistingBooking(data: {
   }
 
   if (
-    booking.startDate.getTime() === requestedInterval.start.getTime() &&
+    booking.startDate.getTime() === requestInterval.start.getTime() &&
     (booking.endDate?.getTime() ?? null) ===
-      (requestedInterval.end?.getTime() ?? null)
+      (requestInterval.end?.getTime() ?? null)
   ) {
     throw new Error('No changes detected');
   }
@@ -311,28 +354,22 @@ export async function rescheduleExistingBooking(data: {
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM "Tour" WHERE id = ${booking.tourId} FOR UPDATE`;
 
-    const existingBookings = await getExistingBookings(
+    await checkAvailability({
       tx,
-      booking.tourId,
-      requestedInterval,
-      booking.id, // exclude current booking from conflict check
-    );
-
-    validateAvailability(
-      booking.pricingType,
-      existingBookings,
-      requestedInterval,
-      booking.tour.joinerCapacity ?? 0,
-      booking.participants,
-    );
+      tourId: booking.tourId,
+      pricingType: booking.pricingType,
+      participants: booking.participants,
+      requestInterval,
+      excludeBookingId: booking.id,
+    });
 
     //we are not going to change the participants number and recalculate because its already paid when confirmed
 
     const updatedBooking = await tx.booking.update({
       where: { id: data.bookingId },
       data: {
-        startDate: requestedInterval.start,
-        endDate: data.newEndDate ? requestedInterval.end : null,
+        startDate: requestInterval.start,
+        endDate: data.newEndDate ? requestInterval.end : null,
         rescheduleCount: booking.rescheduleCount + 1,
         lastRescheduleDate: new Date(),
         scheduleId: data.newScheduleId ?? booking.scheduleId,
@@ -368,74 +405,92 @@ export async function rescheduleExistingBooking(data: {
   });
 }
 
-// export async function adminRescheduleBooking(
-//   bookingId: string,
-//   newStartDate: Date,
-//   newEndDate?: Date | null,
-// ) {
-//   const booking = await prisma.booking.findUnique({
-//     where: { id: bookingId },
-//   });
+export async function createNewBooking({
+  participants,
+  pricingType,
+  startDate,
+  endDate,
+  notes,
+  scheduleId,
+  tourId,
+  userId,
+}: z.infer<typeof createBookingSchema> & { userId: string }) {
+  const interval = normalizeInterval(startDate, endDate);
 
-//   if (!booking) {
-//     throw new Error('Booking not found');
-//   }
+  const tour = await getTourOrThrow(tourId);
 
-//   const tour = await getTourOrThrow(booking.tourId);
+  return prisma.$transaction(async (tx) => {
+    await ensureRows({
+      tx,
+      tourId,
+      interval,
+      scheduleId,
+      capacity: tour.joinerCapacity,
+    });
 
-//   const requestedInterval = normalizeInterval(newStartDate, newEndDate);
+    await reserve({
+      tx,
+      tourId,
+      interval,
+      scheduleId,
+      participants,
+      capacityMode: tour.capacityMode,
+      pricingType,
+    });
 
-//   const existingBookings = await getExistingBookings(
-//     booking.tourId,
-//     requestedInterval,
-//     booking.id, // exclude current booking from conflict check
-//   );
+    const pricing = await calculate({ tx, participants, pricingType, tourId });
 
-//   validateAvailability(
-//     booking.pricingType,
-//     existingBookings,
-//     requestedInterval,
-//     tour.joinerCapacity,
-//     booking.participants,
-//   );
-
-//   return prisma.booking.update({
-//     where: { id: bookingId },
-//     data: {
-//       startDate: requestedInterval.start,
-//       endDate: newEndDate ? requestedInterval.end : null,
-//     },
-//     include: {
-//       tour: {
-//         select: {
-//           id: true,
-//           name: true,
-//           slug: true,
-//           pricing: {
-//             select: { price: true },
-//           },
-//         },
-//       },
-//     },
-//   });
-// }
-
-export async function getBookingById(bookingId: string) {
-  const booking = await prisma.booking.findUnique({
-    where: { id: bookingId },
-    include: {
-      tour: {
-        select: { id: true, name: true, slug: true },
+    const createBooking = await tx.booking.create({
+      data: {
+        tourId,
+        userId,
+        participants,
+        pricingType,
+        scheduleId: scheduleId ?? null,
+        totalPrice: pricing.totalPrice,
+        startDate: interval.start,
+        endDate: interval.end ?? null,
+        notes: notes ?? null,
       },
-      user: {
-        select: { name: true, email: true },
+    });
+
+    await tx.bookingAuditLog.create({
+      data: {
+        action: 'CREATED',
+        actorId: userId,
+        actorType: 'USER',
+        newValue: createBooking,
+        timestamp: new Date(),
+        bookingId: createBooking.id,
       },
-    },
+    });
+
+    return createBooking;
   });
+}
 
-  if (!booking) {
-    throw new Error('Booking not found');
-  }
+export async function rescheduleBooking({
+  bookingId,
+  newStartDate,
+  userId,
+  newEndDate,
+  reason,
+  scheduleId,
+}: z.infer<typeof rescheduleBookingSchema> & { userId: string }) {
+  return prisma.$transaction(async (tx) => {
+    const booking = await tx.booking.findUniqueOrThrow({
+      where: { id: bookingId },
+    });
 
-  return booking;
+    const tour = await getTourOrThrow(booking.tourId);
+
+    const oldInterval = {
+      start: booking.startDate,
+      end: booking.endDate ?? booking.startDate,
+    };
+
+    const newInterval = normalizeInterval(newStartDate, newEndDate);
+
+    if(tour.capacityMode === 'SHARED')
+  });
 }

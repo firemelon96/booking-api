@@ -1,16 +1,16 @@
 import { schedule } from 'node-cron';
 import { z } from 'zod';
+import { CapacityMode, PricingType, TourType } from '../generated/prisma/enums';
 
 export const createBookingSchema = z
   .object({
     tourId: z.uuid(),
     pricingType: z.enum(['JOINER', 'PRIVATE']),
     participants: z.number().int().min(1).max(100),
-    startDate: z.iso.datetime(),
-    endDate: z.iso.datetime().optional(),
+    startDate: z.coerce.date(),
+    endDate: z.coerce.date().optional(),
     scheduleId: z.string().optional(),
     notes: z.string().optional(),
-    type: z.enum(['DAY', 'PACKAGE']).optional(),
   })
   .refine(
     (d) => {
@@ -21,23 +21,14 @@ export const createBookingSchema = z
       message: 'End date must be Greater than the start date',
       path: ['endDate'],
     },
-  )
-  .refine(
-    (d) => {
-      if (d.type === 'DAY') return !d.endDate;
-      return true;
-    },
-    {
-      message: 'Day bookings must be single-day (no end date).',
-      path: ['endDate'],
-    },
   );
 
 export const rescheduleBookingSchema = z
   .object({
-    newStartDate: z.iso.datetime(),
-    newEndDate: z.iso.datetime().optional(),
-    newScheduleId: z.string().optional(),
+    bookingId: z.string(),
+    newStartDate: z.coerce.date(),
+    newEndDate: z.coerce.date().optional(),
+    scheduleId: z.string().optional(),
     reason: z.string().optional(),
   })
   .refine(
@@ -52,3 +43,20 @@ export const rescheduleBookingSchema = z
       path: ['endDate'],
     },
   );
+
+export const reserveSchema = z.object({
+  tour: z.object({
+    id: z.uuid(),
+    capacityMode: z.enum(CapacityMode),
+    joinerCapacity: z.number().optional(),
+    type: z.enum(TourType),
+  }),
+  pricingType: z.enum(PricingType),
+  participants: z.number(),
+  interval: z.object({
+    start: z.coerce.date(),
+    end: z.coerce.date(),
+  }),
+  scheduleId: z.string().optional(),
+  excludeBookingId: z.string().optional(),
+});

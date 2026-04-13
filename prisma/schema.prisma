@@ -46,7 +46,8 @@ model Tour {
   exclusions String[]
   location    String
   durationDays    Int? //For day tours, this will be null. For package tours, this will be the total duration of the tour in days.
-  types       TourType  @default(DAY) 
+  capacityMode  CapacityMode @default(EXCLUSIVE)
+  type       TourType  @default(DAY) 
   timezone  String @default("Asia/Manila") 
 
   schedules   TourScheduleOption[] //For package tours, this will be empty and the schedule will be determined by the itinerary.
@@ -55,9 +56,51 @@ model Tour {
   pricing TourPricing[]
   bookings Booking[]
   reviews Review[]
+  availability TourAvailability[]
+  cancellationPolicy CancellationPolicy?
+  capacity TourDailyCapacity[]
 
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
+}
+
+//================================
+// AVAILABILITY TABLE
+//================================
+model TourAvailability {
+  id      String      @id @default(uuid())
+  date    DateTime
+
+  isClosed    Boolean     @default(false) //If true, the tour is not available for booking on this date. This can be used for maintenance, fully booked dates, etc.
+  tourId  String
+  reason  String? //e.g. "Maintenance", "Fully Booked", etc.
+  tour    Tour        @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
+
+  createdAt DateTime    @default(now())
+  @@unique([tourId, date])
+}
+
+//===============================
+// TOUR DAILY CAPACITY
+//===============================
+model TourDailyCapacity {
+  id      String    @id @default(uuid())
+
+  date    DateTime
+  capacity  Int
+  booked    Int     @default(0)// current used slots
+
+  scheduleId  String?
+  schedule  TourScheduleOption? @relation(fields: [scheduleId], references: [id])
+
+  tourId  String
+  tour Tour @relation(fields: [tourId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tourId, date, scheduleId])
 }
 
 //================================
@@ -65,12 +108,18 @@ model Tour {
 //================================
 model TourScheduleOption {
   id      String      @id @default(uuid())
-  schedule TourSchedule 
 
   tourId  String
   tour    Tour        @relation(fields: [tourId], references: [id], onDelete: Cascade)
 
-  bookings Booking[] //For package tours, this will be empty and the schedule will be determined by the itinerary.
+  label String
+  startTIme String?
+  endTime   String?
+
+  capacity  Int?
+
+  schedules TourDailyCapacity[]
+  bookings Booking[]
 
   createdAt DateTime    @default(now())
 }
@@ -143,13 +192,35 @@ model Image {
 //================================
 model TourPricing {
   id           String   @id @default(uuid())
+
+  tourId       String
+  tour         Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
   pricingType  PricingType
+  
+  pricingModel PricingModel
+
+  price        Float
+
   minGroupSize Int
   maxGroupSize Int
-  price        Float
-  tourId       String
-  isGroupPrice Boolean @default(false) //For joiner tours, this will be true. For private tours, this will be false.
-  tour         Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime    @default(now())
+}
+
+model CancellationPolicy {
+  id          String   @id @default(uuid())
+  description String
+
+  freeCancellationHours Int //Number of hours before the tour start time that cancellation is free. For example, if this is 24, then cancellation is free if done at least 24 hours before the tour start time.
+  partialRefundHours Int //Number of hours before the tour start time that partial refund is given. For example, if this is 12, then partial refund is given if cancellation is done at least 12 hours before the tour start time but less than 24 hours before the tour start time.
+  refundPercentage Int //Percentage of the total price that will be refunded for cancellations that qualify for partial refund. For example, if this is 50, then 50% of the total price will be refunded for cancellations that qualify for partial refund.
+  
+  tourId      String  @unique
+  tour        Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 //================================
@@ -157,6 +228,7 @@ model TourPricing {
 //================================
 model Booking {
   id        String   @id @default(uuid())
+  
   userId    String
   tourId    String
 
@@ -164,14 +236,21 @@ model Booking {
   participants Int
   notes       String?
 
-  rescheduleCount Int @default(0)
-  lastRescheduleDate DateTime?
-
   totalPrice     Float?
   status         BookingStatus @default(PENDING)
 
   startDate DateTime
   endDate   DateTime?
+
+  rescheduleCount Int @default(0)
+  lastRescheduleDate DateTime?
+  canceledAt DateTime?
+
+  expiresAt DateTime?
+
+  refundAmount Float?
+
+  refundStatus RefundStatus?
 
   scheduleId String? //For package tours, this will be null and the schedule will be determined by the itinerary.
 
@@ -186,9 +265,7 @@ model Booking {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([tourId, startDate])
-  @@index([tourId, pricingType, startDate])
-  @@index([userId, createdAt])
+  @@index([tourId, startDate, endDate])
 }
 
 //================================
@@ -320,6 +397,12 @@ enum TourType {
   PACKAGE
 }
 
+enum CapacityMode {
+  EXCLUSIVE
+  SHARED
+  MIXED
+}
+
 enum TourSchedule {
   MORNING
   AFTERNOON
@@ -330,6 +413,11 @@ enum TourSchedule {
 enum PricingType {
   JOINER
   PRIVATE
+}
+
+enum PricingModel {
+  PER_PERSON
+  PER_GROUP
 }
 
 enum Role {
@@ -352,6 +440,13 @@ enum BookingStatus {
   PENDING
   CONFIRMED
   CANCELLED
+}
+
+enum RefundStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REFUNDED
 }
 
 enum PaymentStatus {

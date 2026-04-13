@@ -54,11 +54,22 @@ export async function createTourPricing(params: {
   minGroupSize: number;
   maxGroupSize: number;
   price: number;
-  isGroupPrice: boolean;
+  pricingModel: 'PER_PERSON' | 'PER_GROUP';
 }) {
-  const tour = await prisma.tour.findUnique({ where: { id: params.tourId } });
+  const tour = await prisma.tour.findUnique({
+    where: { id: params.tourId },
+    select: { capacityMode: true },
+  });
 
   if (!tour) throw new Error('Tour not found');
+
+  if (tour.capacityMode === 'EXCLUSIVE' && params.pricingType === 'JOINER') {
+    throw new Error('Joiner pricing not allowed for exclusive tours');
+  }
+
+  if (tour.capacityMode === 'SHARED' && params.pricingType === 'PRIVATE') {
+    throw new Error('Private pricing not allowed for shared tours');
+  }
 
   await assertNoOverlap({
     tourId: params.tourId,
@@ -74,7 +85,7 @@ export async function createTourPricing(params: {
       minGroupSize: params.minGroupSize,
       maxGroupSize: params.maxGroupSize,
       price: params.price,
-      isGroupPrice: params.isGroupPrice,
+      pricingModel: params.pricingModel,
     },
   });
 }
