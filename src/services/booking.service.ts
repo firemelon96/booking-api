@@ -479,6 +479,7 @@ export async function createNewBooking({
       interval,
       participants,
       scheduleId,
+      scheduleKey,
       capacityMode: tour.capacityMode,
       pricingType,
     });

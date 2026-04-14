@@ -35,12 +35,14 @@ export async function getRows({
   tx,
   tourId,
   interval,
-  scheduleId,
+  // scheduleId,
+  scheduleKey,
 }: {
   tx: Prisma.TransactionClient;
   tourId: string;
   interval: { start: Date; end: Date };
-  scheduleId?: string | null;
+  // scheduleId?: string | null;
+  scheduleKey: string;
 }) {
   return tx.tourDailyCapacity.findMany({
     where: {
@@ -49,7 +51,7 @@ export async function getRows({
         gte: interval.start,
         lte: interval.end,
       },
-      scheduleId: scheduleId ?? null,
+      scheduleKey,
     },
   });
 }

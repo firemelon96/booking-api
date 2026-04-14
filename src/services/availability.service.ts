@@ -90,6 +90,7 @@ export async function reserve({
   capacityMode,
   participants,
   pricingType,
+  scheduleKey,
 }: {
   tx: Prisma.TransactionClient;
   tourId: string;
@@ -99,6 +100,7 @@ export async function reserve({
   capacityMode: 'EXCLUSIVE' | 'SHARED' | 'MIXED';
   pricingType: 'PRIVATE' | 'JOINER';
   participants: number;
+  scheduleKey: string;
 }) {
   await lock({ tx, tourId, interval });
 
@@ -122,6 +124,7 @@ export async function reserve({
       participants,
       scheduleId,
       excludeBookingId,
+      scheduleKey,
     });
   }
 
@@ -143,6 +146,7 @@ export async function reserve({
       participants,
       scheduleId,
       excludeBookingId,
+      scheduleKey,
     });
   }
 }
@@ -202,6 +206,7 @@ async function checkShared({
   participants,
   scheduleId,
   excludeBookingId,
+  scheduleKey,
 }: {
   tx: Prisma.TransactionClient;
   tourId: string;
@@ -209,6 +214,7 @@ async function checkShared({
   participants: number;
   scheduleId?: string | null;
   excludeBookingId?: string | null;
+  scheduleKey: string;
 }) {
   const privateConflict = await tx.booking.findFirst({
     where: {
@@ -226,7 +232,7 @@ async function checkShared({
 
   const days = eachDayOfInterval(interval);
 
-  const rows = await getRows({ tx, tourId, interval, scheduleId });
+  const rows = await getRows({ tx, tourId, interval, scheduleKey });
 
   const map = new Map(rows.map((r) => [r.date.getTime(), r]));
 
