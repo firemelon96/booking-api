@@ -94,13 +94,15 @@ model TourDailyCapacity {
   scheduleId  String?
   schedule  TourScheduleOption? @relation(fields: [scheduleId], references: [id])
 
+  scheduleKey String
+
   tourId  String
   tour Tour @relation(fields: [tourId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([tourId, date, scheduleId])
+  @@unique([tourId, date, scheduleKey])
 }
 
 //================================
@@ -236,7 +238,7 @@ model Booking {
   participants Int
   notes       String?
 
-  totalPrice     Float?
+  totalPrice     Float
   status         BookingStatus @default(PENDING)
 
   startDate DateTime
@@ -440,6 +442,7 @@ enum BookingStatus {
   PENDING
   CONFIRMED
   CANCELLED
+  EXPIRED
 }
 
 enum RefundStatus {

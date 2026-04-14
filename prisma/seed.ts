@@ -6,6 +6,10 @@ import {
   Role,
   TourSchedule,
 } from '../src/generated/prisma/enums';
+import { seedExclusive } from './exclusive';
+import { seedShared } from './shared';
+import { seedMixed } from './mixed';
+import { seedMixedDayTour } from './mixed-day';
 
 async function main() {
   console.log('🌱 Seeding database...');
@@ -17,6 +21,7 @@ async function main() {
   await prisma.user.deleteMany();
   await prisma.itinerary.deleteMany();
   await prisma.tourScheduleOption.deleteMany();
+  await prisma.tourDailyCapacity.deleteMany();
 
   // Password hash
   const password = await bcrypt.hash('password123', 10);
@@ -38,212 +43,18 @@ async function main() {
     },
   });
 
-  const dayTour = await prisma.tour.create({
-    data: {
-      name: 'Honda bay tour',
-      slug: 'honda-bay-tour',
-      description:
-        'Experience the beauty of Honda Bay with our exciting day tour, perfect for nature lovers and adventure seekers. Explore pristine beaches, vibrant coral reefs, and diverse marine life in this unforgettable island-hopping adventure.',
-      inclusions: [
-        'Hotel pickup and drop-off',
-        'Lunch',
-        'Tour guide',
-        'Entrance fees',
-      ],
-      exclusions: ['Personal expenses', 'Gratuities'],
-      location: 'Puerto Princesa, Palawan',
-    },
-  });
-
-  await prisma.tourPricing.createMany({
-    data: [
-      {
-        tourId: dayTour.id,
-        pricingType: PricingType.JOINER,
-        minGroupSize: 1,
-        maxGroupSize: 10,
-        price: 1500,
-        pricingModel: PricingModel.PER_PERSON,
-      },
-      {
-        tourId: dayTour.id,
-        pricingType: PricingType.PRIVATE,
-        minGroupSize: 1,
-        maxGroupSize: 2,
-        price: 4000,
-        pricingModel: PricingModel.PER_GROUP,
-      },
-      {
-        tourId: dayTour.id,
-        pricingType: PricingType.PRIVATE,
-        minGroupSize: 3,
-        maxGroupSize: 5,
-        price: 7000,
-        pricingModel: PricingModel.PER_GROUP,
-      },
-    ],
-  });
-
-  await prisma.tourScheduleOption.createMany({
-    data: [
-      {
-        label: 'Morning',
-        tourId: dayTour.id,
-        startTIme: '8:00 AM',
-      },
-      {
-        label: 'Afternoon',
-        tourId: dayTour.id,
-        startTIme: '1:00 PM',
-      },
-    ],
-  });
-
-  await prisma.itinerary.create({
-    data: {
-      tourId: dayTour.id,
-      days: {
-        create: [
-          {
-            dayNumber: 1,
-            title: 'Hotel Pickup and Travel to Honda Bay',
-            items: {
-              create: [
-                {
-                  time: '8:00 AM - 9:00 AM',
-                  title: 'Hotel Pickup',
-                  description:
-                    'Our friendly guide will pick you up from your hotel in Puerto Princesa.',
-                  order: 1,
-                },
-                {
-                  time: '9:00 AM - 10:30 AM',
-                  title: 'Travel to Honda Bay',
-                  description:
-                    'Enjoy the scenic drive to Honda Bay, passing through beautiful landscapes and local villages.',
-                  order: 2,
-                },
-              ],
-            },
-          },
-        ],
-      },
-    },
-  });
-
-  // Tour
-  const tour = await prisma.tour.create({
-    data: {
-      name: '2 days 1 night Puerto Princesa Underground River Tour',
-      slug: '2-days-1-night-puerto-princesa-underground-river-tour',
-      description:
-        'Explore the stunning underground river in Puerto Princesa, Palawan.',
-      inclusions: [
-        'Hotel pickup and drop-off',
-        'Lunch',
-        'Tour guide',
-        'Entrance fees',
-      ],
-      exclusions: ['Personal expenses', 'Gratuities'],
-      location: 'Puerto Princesa, Palawan',
-      type: 'PACKAGE',
-    },
-  });
-
-  await prisma.itinerary.create({
-    data: {
-      tourId: tour.id,
-      days: {
-        create: [
-          {
-            dayNumber: 1,
-            title: 'Hotel Pickup and Travel to Underground River',
-            items: {
-              create: [
-                {
-                  time: '8:00 AM - 9:00 AM',
-                  title: 'Hotel Pickup',
-                  description:
-                    'Our friendly guide will pick you up from your hotel in Puerto Princesa.',
-                  order: 1,
-                },
-                {
-                  time: '9:00 AM - 10:30 AM',
-                  title: 'Travel to Underground River',
-                  description:
-                    'Enjoy the scenic drive to the underground river, passing through beautiful landscapes and local villages.',
-                  order: 2,
-                },
-              ],
-            },
-          },
-          {
-            dayNumber: 2,
-            title: 'Underground River Tour and Return',
-            items: {
-              create: [
-                {
-                  time: '10:30 AM - 12:30 PM',
-                  title: 'Underground River Tour',
-                  description:
-                    'Explore the stunning underground river with our expert guide, marveling at the unique rock formations and diverse wildlife.',
-                  order: 1,
-                },
-                {
-                  time: '12:30 PM - 1:30 PM',
-                  title: 'Lunch',
-                  description:
-                    'Enjoy a delicious lunch featuring local cuisine at a nearby restaurant.',
-                  order: 2,
-                },
-                {
-                  time: '1:30 PM - 3:00 PM',
-                  title: 'Return to Hotel',
-                  description:
-                    'Relax during the scenic drive back to your hotel, reflecting on the unforgettable experience.',
-                  order: 3,
-                },
-              ],
-            },
-          },
-        ],
-      },
-    },
-  });
-
-  // Pricing (joiner + private)
-  await prisma.tourPricing.createMany({
-    data: [
-      {
-        tourId: tour.id,
-        pricingType: PricingType.JOINER,
-        minGroupSize: 1,
-        maxGroupSize: 10,
-        price: 2000,
-        pricingModel: PricingModel.PER_PERSON,
-      },
-      {
-        tourId: tour.id,
-        pricingType: PricingType.PRIVATE,
-        minGroupSize: 1,
-        maxGroupSize: 2,
-        price: 5000,
-        pricingModel: PricingModel.PER_GROUP,
-      },
-      {
-        tourId: tour.id,
-        pricingType: PricingType.PRIVATE,
-        minGroupSize: 3,
-        maxGroupSize: 5,
-        price: 8000,
-        pricingModel: PricingModel.PER_GROUP,
-      },
-    ],
-  });
+  const exclusiveTour = await seedExclusive();
+  const sharedTour = await seedShared();
+  const mixedTour = await seedMixed();
+  const mixedDayTour = await seedMixedDayTour();
 
   console.log('✅ Seed completed');
   console.log('👤 Admin:', admin.email);
   console.log('👤 User:', user.email);
+  console.log('⛰️ Exclusive tour', exclusiveTour.id);
+  console.log('🚵 Shared tour', sharedTour.id);
+  console.log('🌅 Mixed package tour', mixedTour.id);
+  console.log('🌅 Mixed day tour', mixedDayTour.id);
 }
 
 main()

@@ -5,12 +5,15 @@ import {
   checkAvailability,
   getDaysDiff,
   getTourOrThrow,
+  isExpired,
   normalizeInterval,
   reserveCapacity,
+  sanitizeBooking,
 } from '../utils/helper';
 import { calculate, calculateTotalPrice } from './pricing.service';
 import { get } from 'lodash';
 import {
+  BOOKING_RULES,
   COOLDOWN_HOURS,
   LOCK_HOURS,
   MAX_RESCHEDULES,
@@ -22,8 +25,9 @@ import {
   createBookingSchema,
   rescheduleBookingSchema,
 } from '../validators/booking.schema';
-import { ensureRows } from './capacity.service';
+import { decrement, ensureRows, getRows } from './capacity.service';
 import { reserve } from './availability.service';
+import { Prisma } from '../generated/prisma/client';
 
 export async function listAllBookings() {
   return prisma.booking.findMany({
@@ -71,29 +75,29 @@ export async function listMyBookings(userId: string) {
   });
 }
 
-export async function cancelBooking(params: {
-  bookingId: string;
-  userId: string;
-}) {
-  return prisma.$transaction(async (tx) => {
-    const booking = await tx.booking.findUnique({
-      where: { id: params.bookingId },
-      include: {
-        tour: {
-          include: { cancellationPolicy: true },
-        },
-      },
-    });
+// export async function cancelBooking(params: {
+//   bookingId: string;
+//   userId: string;
+// }) {
+//   return prisma.$transaction(async (tx) => {
+//     const booking = await tx.booking.findUnique({
+//       where: { id: params.bookingId },
+//       include: {
+//         tour: {
+//           include: { cancellationPolicy: true },
+//         },
+//       },
+//     });
 
-    if (booking?.userId !== params.userId) {
-      throw new Error('Unauthorized');
-    }
+//     if (booking?.userId !== params.userId) {
+//       throw new Error('Unauthorized');
+//     }
 
-    if (booking.status !== 'CONFIRMED') {
-      throw new Error('Only confirmed booking can be cancel.');
-    }
-  });
-}
+//     if (booking.status !== 'CONFIRMED') {
+//       throw new Error('Only confirmed booking can be cancel.');
+//     }
+//   });
+// }
 
 export async function getBookingById(bookingId: string) {
   const booking = await prisma.booking.findUnique({
@@ -405,6 +409,8 @@ export async function rescheduleExistingBooking(data: {
   });
 }
 
+//NEW LOGIC
+
 export async function createNewBooking({
   participants,
   pricingType,
@@ -419,21 +425,60 @@ export async function createNewBooking({
 
   const tour = await getTourOrThrow(tourId);
 
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000); //15 minutes
+
+  //schedule is provided but does not have schedules link to tour
+  if (tour.schedules.length === 0) {
+    if (scheduleId) {
+      throw new Error('Tour does not require schedule.');
+    }
+
+    if (interval.end.getTime() === interval.start.getTime()) {
+      throw new Error('Cannot be the same date for multi days');
+    }
+  }
+
+  //schedule is link with tour, if no schedule selected and does not exist in the tour schedule. guard
+  if (tour.schedules.length > 0) {
+    if (interval.end.getTime() !== interval.start.getTime()) {
+      throw new Error('Cannot have multiple days.');
+    }
+
+    if (!scheduleId) {
+      throw new Error('Schedule must be selected');
+    }
+
+    if (
+      !tour.schedules.some((s) => s.id === scheduleId || s.id === 'NO_SCHEDULE')
+    ) {
+      throw new Error('Invalid schedule selected');
+    }
+  }
+
+  const scheduleKey = scheduleId ?? 'NO_SCHEDULE';
+
   return prisma.$transaction(async (tx) => {
-    await ensureRows({
-      tx,
-      tourId,
-      interval,
-      scheduleId,
-      capacity: tour.joinerCapacity,
-    });
+    const needsCapacity =
+      tour.capacityMode === 'SHARED' ||
+      (tour.capacityMode === 'MIXED' && pricingType === 'JOINER');
+
+    if (needsCapacity) {
+      await ensureRows({
+        tx,
+        tourId,
+        interval,
+        scheduleId,
+        scheduleKey,
+        capacity: tour.joinerCapacity ?? 0,
+      });
+    }
 
     await reserve({
       tx,
       tourId,
       interval,
-      scheduleId,
       participants,
+      scheduleId,
       capacityMode: tour.capacityMode,
       pricingType,
     });
@@ -451,6 +496,7 @@ export async function createNewBooking({
         startDate: interval.start,
         endDate: interval.end ?? null,
         notes: notes ?? null,
+        expiresAt,
       },
     });
 
@@ -491,6 +537,245 @@ export async function rescheduleBooking({
 
     const newInterval = normalizeInterval(newStartDate, newEndDate);
 
-    if(tour.capacityMode === 'SHARED')
+    const oldSnapshot = sanitizeBooking(booking);
+
+    const scheduleKey = scheduleId ?? 'NO_SCHEDULE';
+
+    if (booking.status === 'PENDING') {
+      throw new Error('Cannot reschedule pending booking');
+    }
+
+    if (booking.status === 'EXPIRED') {
+      throw new Error('Cannot reschedule expired booking');
+    }
+
+    const cutoff = new Date(
+      booking.startDate.getTime() -
+        BOOKING_RULES.RESCHEDULE_CUTOFF_HOURS * 60 * 60 * 1000,
+    );
+
+    if (new Date() > cutoff) {
+      throw new Error(
+        `Rescheduling must be done at least ${BOOKING_RULES.RESCHEDULE_CUTOFF_HOURS} hours before the booking start time.`,
+      );
+    }
+
+    if (booking.rescheduleCount >= BOOKING_RULES.MAX_RESCHEDULES) {
+      throw new Error(
+        `Maximum reschedule limit of ${BOOKING_RULES.MAX_RESCHEDULES} reached for this booking.`,
+      );
+    }
+
+    const needsCapacity =
+      tour.capacityMode === 'SHARED' ||
+      (tour.capacityMode === 'MIXED' && booking.pricingType === 'JOINER');
+
+    if (needsCapacity) {
+      ensureRows({
+        tx,
+        tourId: tour.id,
+        interval: newInterval,
+        scheduleId,
+        scheduleKey,
+        capacity: tour.joinerCapacity ?? 0,
+      });
+    }
+
+    //reserve New first
+    await reserve({
+      tx,
+      tourId: tour.id,
+      pricingType: booking.pricingType,
+      capacityMode: tour.capacityMode,
+      interval: newInterval,
+      participants: booking.participants,
+      scheduleId,
+      excludeBookingId: booking.id,
+    });
+
+    // release OLD ONLY if it used capacity
+    const usedCapacity =
+      tour.capacityMode === 'SHARED' ||
+      (tour.capacityMode === 'MIXED' && booking.pricingType === 'JOINER');
+
+    if (usedCapacity) {
+      const oldRows = await getRows({
+        tx,
+        tourId: tour.id,
+        interval: oldInterval,
+        scheduleId: booking.scheduleId,
+      });
+
+      await decrement({
+        tx,
+        rows: oldRows,
+        participants: booking.participants,
+      });
+    }
+
+    const updatedBooking = await tx.booking.update({
+      where: { id: booking.id },
+      data: {
+        startDate: newInterval.start,
+        endDate: newInterval.end,
+        scheduleId: scheduleId ?? null,
+        rescheduleCount: { increment: 1 },
+        lastRescheduleDate: new Date(),
+      },
+    });
+
+    await tx.bookingAuditLog.create({
+      data: {
+        bookingId: booking.id,
+        actorId: userId,
+        actorType: 'USER',
+        action: 'RESCHEDULED',
+        previousValue: oldSnapshot,
+        newValue: sanitizeBooking(updatedBooking),
+        reason: reason ?? null,
+      },
+    });
+
+    return updatedBooking;
   });
+}
+
+export async function cancelBooking({
+  bookingId,
+  userId,
+}: {
+  bookingId: string;
+  userId: string;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const booking = await tx.booking.findUniqueOrThrow({
+      where: { id: bookingId },
+    });
+
+    const tour = await getTourOrThrow(booking.tourId);
+
+    //protection
+    if (booking.status === 'CANCELLED' || booking.status === 'EXPIRED') {
+      return booking; // idempotent
+    }
+
+    if (booking.startDate < new Date()) {
+      throw new Error('Cannot cancel past bookings');
+    }
+
+    const cutoff = new Date(
+      booking.startDate.getTime() -
+        BOOKING_RULES.RESCHEDULE_CUTOFF_HOURS * 60 * 60 * 1000,
+    );
+
+    if (new Date() > cutoff) {
+      throw new Error(
+        `Cancellations must be made at least ${BOOKING_RULES.RESCHEDULE_CUTOFF_HOURS} hours before the booking start time.`,
+      );
+    }
+
+    const oldSnapshot = sanitizeBooking(booking);
+
+    const interval = {
+      start: booking.startDate,
+      end: booking.endDate ?? booking.startDate,
+    };
+
+    if (
+      tour.capacityMode === 'SHARED' ||
+      (tour.capacityMode === 'MIXED' && booking.pricingType === 'JOINER')
+    ) {
+      const rows = await getRows({
+        tx,
+        tourId: tour.id,
+        interval,
+        scheduleId: booking.scheduleId,
+      });
+
+      await decrement({
+        tx,
+        rows,
+        participants: booking.participants,
+      });
+    }
+
+    const cancelledBooking = await tx.booking.update({
+      where: { id: booking.id },
+      data: { status: 'CANCELLED', canceledAt: new Date() },
+    });
+
+    await tx.bookingAuditLog.create({
+      data: {
+        bookingId: booking.id,
+        actorId: userId,
+        actorType: 'USER',
+        action: 'CANCELLED',
+        previousValue: oldSnapshot,
+        newValue: sanitizeBooking(cancelledBooking),
+      },
+    });
+
+    return cancelledBooking;
+  });
+}
+
+export async function expireBooking({
+  tx,
+  bookingId,
+}: {
+  tx: Prisma.TransactionClient;
+  bookingId: string;
+}) {
+  const booking = await tx.booking.findUniqueOrThrow({
+    where: { id: bookingId },
+  });
+
+  //idempotent
+  if (booking.status !== 'PENDING') return booking;
+
+  if (!isExpired(booking.status, booking.expiresAt)) return booking;
+
+  const tour = await getTourOrThrow(booking.tourId);
+
+  const oldSnapshot = sanitizeBooking(booking);
+
+  const interval = {
+    start: booking.startDate,
+    end: booking.endDate ?? booking.startDate,
+  };
+
+  //release capacity ONLY if used
+  if (
+    tour.capacityMode === 'SHARED' ||
+    (tour.capacityMode === 'MIXED' && booking.pricingType === 'JOINER')
+  ) {
+    const rows = await getRows({
+      tx,
+      tourId: tour.id,
+      interval,
+      scheduleId: booking.scheduleId,
+    });
+
+    await decrement({ tx, rows, participants: booking.participants });
+  }
+
+  const updated = await tx.booking.update({
+    where: { id: booking.id },
+    data: {
+      status: 'EXPIRED',
+    },
+  });
+
+  await tx.bookingAuditLog.create({
+    data: {
+      bookingId: booking.id,
+      action: 'CANCELLED', //TODO add EXPIRED enum
+      actorId: 'SYSTEM',
+      actorType: 'ADMIN', //TODO add SYSTEM to actor type enum
+      previousValue: oldSnapshot,
+      newValue: sanitizeBooking(updated),
+    },
+  });
+
+  return updated;
 }

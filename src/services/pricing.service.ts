@@ -26,7 +26,7 @@ export async function calculate({
     );
   });
 
-  if (!pricing) throw new Error('No pricing availanle for this group size');
+  if (!pricing) throw new Error('No pricing available for this group size');
 
   if (pricing.pricingModel === 'PER_PERSON') {
     return { totalPrice: pricing.price * participants };

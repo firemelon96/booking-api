@@ -15,6 +15,7 @@ import {
 export async function create(req: Request, res: Response) {
   try {
     const userId = req.user?.userId;
+
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }

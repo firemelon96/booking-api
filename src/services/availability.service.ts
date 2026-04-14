@@ -136,16 +136,14 @@ export async function reserve({
       });
     }
 
-    if (pricingType === 'JOINER') {
-      return checkShared({
-        tx,
-        tourId,
-        interval,
-        participants,
-        scheduleId,
-        excludeBookingId,
-      });
-    }
+    return checkShared({
+      tx,
+      tourId,
+      interval,
+      participants,
+      scheduleId,
+      excludeBookingId,
+    });
   }
 }
 
@@ -212,6 +210,20 @@ async function checkShared({
   scheduleId?: string | null;
   excludeBookingId?: string | null;
 }) {
+  const privateConflict = await tx.booking.findFirst({
+    where: {
+      tourId,
+      pricingType: 'PRIVATE',
+      status: { in: ['CONFIRMED', 'PENDING'] },
+      ...(excludeBookingId && { NOT: { id: excludeBookingId } }),
+      startDate: { lte: interval.end },
+      endDate: { gte: interval.start },
+      scheduleId: scheduleId ?? null,
+    },
+  });
+
+  if (privateConflict) throw new Error('Date has a private booking');
+
   const days = eachDayOfInterval(interval);
 
   const rows = await getRows({ tx, tourId, interval, scheduleId });
@@ -219,7 +231,7 @@ async function checkShared({
   const map = new Map(rows.map((r) => [r.date.getTime(), r]));
 
   for (const day of days) {
-    const row = map.get(startOfDay(day).getTime());
+    const row = map.get(day.getTime());
 
     if (!row) throw new Error('Capacity not initialized');
 

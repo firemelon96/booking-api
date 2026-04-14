@@ -7,12 +7,14 @@ export async function ensureRows({
   interval,
   scheduleId,
   capacity,
+  scheduleKey,
 }: {
   tx: Prisma.TransactionClient;
   tourId: string;
   interval: { start: Date; end: Date };
   scheduleId?: string | null;
   capacity: number;
+  scheduleKey: string;
 }) {
   const dates = eachDayOfInterval(interval);
 
@@ -21,6 +23,7 @@ export async function ensureRows({
       tourId,
       date: d,
       scheduleId: scheduleId ?? null,
+      scheduleKey,
       capacity,
       booked: 0,
     })),
