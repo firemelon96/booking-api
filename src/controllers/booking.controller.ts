@@ -9,6 +9,7 @@ import {
   getBookingById,
   listAllBookings,
   listMyBookings,
+  rescheduleBooking,
   rescheduleExistingBooking,
 } from '../services/booking.service';
 
@@ -75,7 +76,7 @@ export async function getBookingDetails(req: Request, res: Response) {
   }
 }
 
-export async function rescheduleBooking(req: Request, res: Response) {
+export async function reschedule(req: Request, res: Response) {
   try {
     const { bookingId } = req.params;
     const userId = req.user?.userId;
@@ -90,13 +91,10 @@ export async function rescheduleBooking(req: Request, res: Response) {
 
     const body = rescheduleBookingSchema.parse(req.body);
 
-    const updatedBooking = await rescheduleExistingBooking({
-      bookingId,
+    const updatedBooking = await rescheduleBooking({
+      ...body,
       userId,
-      newStartDate: new Date(body.newStartDate),
-      newEndDate: body.newEndDate ? new Date(body.newEndDate) : null,
-      newScheduleId: body.newScheduleId || null,
-      reason: body.reason ?? null,
+      bookingId,
     });
 
     return res.json(updatedBooking);

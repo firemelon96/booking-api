@@ -25,7 +25,6 @@ export const createBookingSchema = z
 
 export const rescheduleBookingSchema = z
   .object({
-    bookingId: z.string(),
     newStartDate: z.coerce.date(),
     newEndDate: z.coerce.date().optional(),
     scheduleId: z.string().optional(),

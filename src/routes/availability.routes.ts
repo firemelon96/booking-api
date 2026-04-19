@@ -1,5 +1,9 @@
 import { Router } from 'express';
-import { getAvailability } from '../controllers/availability.controller';
+import {
+  availability,
+  getAvailability,
+} from '../controllers/availability.controller';
+import { getCalendarAvailability } from '../services/availability.service';
 
 const router = Router({ mergeParams: true });
 
@@ -32,6 +36,8 @@ const router = Router({ mergeParams: true });
  *         description: Availability per day
  */
 
-router.get('/', getAvailability);
+// router.get('/', getAvailability);
+
+router.get('/calendar', availability);
 
 export default router;

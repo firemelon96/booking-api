@@ -2,7 +2,9 @@ import {
   areIntervalsOverlapping,
   differenceInCalendarDays,
   eachDayOfInterval,
+  endOfMonth,
   startOfDay,
+  startOfMonth,
 } from 'date-fns';
 import { prisma } from '../config/prisma';
 import { BookingStatus, Prisma } from '../generated/prisma/client';
@@ -28,6 +30,32 @@ export function overlaps(
   b: { start: Date; end: Date },
 ) {
   return areIntervalsOverlapping(a, b, { inclusive: true });
+}
+
+export function getMonthRange(month: string) {
+  const [year, m] = month.split('-').map(Number);
+
+  const start = startOfMonth(new Date(year, m - 1));
+  const end = endOfMonth(start);
+
+  return { start, end };
+}
+
+export function getScheduleKey(scheduleId?: string | null) {
+  return scheduleId ?? 'NO_SCHEDULE';
+}
+
+export function isActiveBooking(
+  b: { status: BookingStatus; expiresAt: Date | null },
+  now: Date,
+) {
+  if (b.status === 'CONFIRMED') return true;
+
+  if (b.status === 'PENDING' && b.expiresAt && b.expiresAt > now) {
+    return true;
+  }
+
+  return false;
 }
 
 export async function getTourOrThrow(tourId: string) {

@@ -84,7 +84,7 @@ router.use('/:tourId/featured', imageRoutes);
 
 router.use('/:tourId/pricing', tourPricingRoutes);
 
-router.use('/:tourId/availability', availabilityRoutes);
+// router.use('/:tourId/availability', availabilityRoutes);
 
 router.use('/:tourId/itinerary', itineraryRoutes);
 

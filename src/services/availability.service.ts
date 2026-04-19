@@ -1,12 +1,136 @@
 import { prisma } from '../config/prisma';
 import { parseISO, eachDayOfInterval, startOfDay } from 'date-fns';
-import { normalizeInterval, overlaps } from '../utils/helper';
+import {
+  getMonthRange,
+  getScheduleKey,
+  getTourOrThrow,
+  isActiveBooking,
+  normalizeInterval,
+  overlaps,
+} from '../utils/helper';
 import { PricingType } from '../types/pricing-type';
 import { Prisma, Tour } from '../generated/prisma/client';
 import { getRows, increment, lock } from './capacity.service';
+import z from 'zod';
+import { availabilityParam } from '../validators/availability.schema';
 
 function dayKey(d: Date) {
   return d.toISOString().slice(0, 10);
+}
+
+export async function getCalendarAvailability({
+  month,
+  tourId,
+  scheduleId,
+}: z.infer<typeof availabilityParam>) {
+  // console.log(month);
+  const tour = await getTourOrThrow(tourId);
+
+  const scheduleKey = getScheduleKey(scheduleId);
+  const { start, end } = getMonthRange(month);
+
+  const days = eachDayOfInterval({ start, end });
+
+  return prisma.$transaction(async (tx) => {
+    const bookings = await tx.booking.findMany({
+      where: {
+        tourId,
+        startDate: { lte: end },
+        endDate: { gte: start },
+      },
+      select: {
+        startDate: true,
+        endDate: true,
+        pricingType: true,
+        scheduleId: true,
+        participants: true,
+        status: true,
+        expiresAt: true,
+      },
+    });
+
+    const now = new Date();
+
+    const activeBookings = bookings.filter((b) => {
+      if (!isActiveBooking(b, now)) return false;
+
+      const bKey = getScheduleKey(b.scheduleId);
+      return bKey === scheduleKey;
+    });
+
+    const capacityRow = await tx.tourDailyCapacity.findMany({
+      where: {
+        tourId,
+        date: { gte: start, lte: end },
+        scheduleKey,
+      },
+      select: { date: true, capacity: true },
+    });
+
+    const capacityMap = new Map(
+      capacityRow.map((c) => [startOfDay(c.date).getTime(), c.capacity]),
+    );
+
+    const results = [];
+
+    for (const day of days) {
+      const dayKey = startOfDay(day).getTime();
+
+      const dayBookings = activeBookings.filter((b) => {
+        return b.startDate <= day && (b.endDate ?? b.startDate) >= day;
+      });
+
+      //private check
+      const hasPrivate = dayBookings.some((b) => b.pricingType === 'PRIVATE');
+
+      //joiner count
+      const totalJoiners = dayBookings
+        .filter((b) => b.pricingType === 'JOINER')
+        .reduce((sum, b) => sum + b.participants, 0);
+
+      const capacity =
+        (capacityMap.get(dayKey) ?? tour.capacityMode !== 'EXCLUSIVE')
+          ? tour.joinerCapacity
+          : 0;
+
+      let available = true;
+      let remainingSlots: number | null = null;
+
+      //apply mode logic
+      if (tour.capacityMode === 'EXCLUSIVE') {
+        available = dayBookings.length === 0;
+        remainingSlots = null;
+      }
+
+      if (tour.capacityMode === 'SHARED') {
+        remainingSlots = capacity - totalJoiners;
+        available = remainingSlots > 0;
+      }
+
+      if (tour.capacityMode === 'MIXED') {
+        if (hasPrivate) {
+          available = false;
+          remainingSlots = null;
+        } else {
+          remainingSlots = capacity - totalJoiners;
+          available = remainingSlots > 0;
+        }
+      }
+
+      results.push({
+        date: day.toISOString().slice(0, 10),
+        available,
+        remainingSlots: remainingSlots && Math.max(remainingSlots, 0),
+        isFullyBooked: !available,
+        hasPrivateBooking: hasPrivate,
+      });
+    }
+
+    return {
+      month,
+      days: results,
+    };
+  });
 }
 
 export async function getTourAvailability(params: {
@@ -248,3 +372,5 @@ async function checkShared({
 
   await increment({ tx, rows, participants });
 }
+
+async function expired() {}

@@ -10,6 +10,7 @@ import pricingRoutes from './routes/pricing.routes';
 import bookingRoutes from './routes/booking.routes';
 import userRoutes from './routes/user.routes';
 import uploadRoutes from './routes/upload.routes';
+import availabilityRoutes from './routes/availability.routes';
 import paymentRoutes from './routes/payment.routes';
 import webhookRoutes from './routes/webhook.routes';
 import path from 'path';
@@ -37,6 +38,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/payments', paymentRoutes);
 
 app.use('/api/webhook', webhookRoutes);
+app.use('/api/availability', availabilityRoutes);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));

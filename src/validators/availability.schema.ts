@@ -8,6 +8,12 @@ export const availabilityQuerySchema = z.object({
   pricingType: z.enum(['JOINER', 'PRIVATE']).optional(),
 });
 
+export const availabilityParam = z.object({
+  tourId: z.string(),
+  month: z.string().regex(/^\d{4}-\d{2}$/),
+  scheduleId: z.string().optional(),
+});
+
 export const reserveSchema = z.object({
   tour: createTourSchema,
   pricingType: z.enum(PricingType),
