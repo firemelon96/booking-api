@@ -4,13 +4,10 @@ import {
   rescheduleBookingSchema,
 } from '../validators/booking.schema';
 import {
-  createBooking,
   createNewBooking,
   getBookingById,
-  listAllBookings,
   listMyBookings,
   rescheduleBooking,
-  rescheduleExistingBooking,
 } from '../services/booking.service';
 
 export async function create(req: Request, res: Response) {
@@ -46,15 +43,6 @@ export async function myBookings(req: Request, res: Response) {
     }
 
     const bookings = await listMyBookings(req.user.userId);
-    return res.json(bookings);
-  } catch (err: any) {
-    return res.status(400).json({ error: err.message });
-  }
-}
-
-export async function adminGetBookings(req: Request, res: Response) {
-  try {
-    const bookings = await listAllBookings();
     return res.json(bookings);
   } catch (err: any) {
     return res.status(400).json({ error: err.message });

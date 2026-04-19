@@ -56,8 +56,9 @@ const router = Router();
 
 router.post('/create', authenticate, ctrl.create);
 router.get('/my-bookings', authenticate, ctrl.myBookings);
-router.get('/all-bookings', authenticate, requireAdmin, ctrl.adminGetBookings);
-router.patch('/:bookingId/reschedule', authenticate, ctrl.reschedule);
 router.get('/:bookingId', authenticate, ctrl.getBookingDetails);
+router.patch('/:bookingId/reschedule', authenticate, ctrl.reschedule);
+
+router.get('/all-bookings', authenticate, requireAdmin, ctrl.adminGetBookings);
 
 export default router;

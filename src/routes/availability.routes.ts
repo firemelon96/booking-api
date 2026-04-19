@@ -36,8 +36,6 @@ const router = Router({ mergeParams: true });
  *         description: Availability per day
  */
 
-// router.get('/', getAvailability);
-
-router.get('/calendar', availability);
+router.get('/', availability);
 
 export default router;
