@@ -5,6 +5,7 @@ import {
   upsertCapacity,
 } from '../services/capacity.service';
 import { listAllBookings } from '../services/booking.service';
+import { getAllBookingsParamsSchema } from '../validators/admin.schema';
 
 export async function setCapacityController(req: Request, res: Response) {
   const { tourId, date, scheduleId, capacity } = req.body;
@@ -33,7 +34,19 @@ export async function bulkCapacityController(req: Request, res: Response) {
 }
 
 export async function getAdminBookingsController(req: Request, res: Response) {
-  const bookings = await listAllBookings();
+  const fields = getAllBookingsParamsSchema.safeParse(req.query);
+
+  if (!fields.success) return res.status(500).json({ error: 'Invalid fields' });
+
+  const bookings = await listAllBookings({
+    ...fields.data,
+    page: Number(fields.data?.page),
+    limit: Number(fields.data?.limit),
+    startDate: fields.data?.startDate
+      ? new Date(fields.data.startDate)
+      : undefined,
+    endDate: fields.data?.endDate ? new Date(fields.data.endDate) : undefined,
+  });
   res.json(bookings);
 }
 

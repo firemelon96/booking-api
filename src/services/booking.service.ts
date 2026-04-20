@@ -13,56 +13,196 @@ import { startOfDay } from 'date-fns';
 import z from 'zod';
 import {
   createBookingSchema,
+  GetMyBookingsParamType,
   rescheduleBookingSchema,
 } from '../validators/booking.schema';
 import { decrement, ensureRows, getRows } from './capacity.service';
 import { reserve } from './availability.service';
 import { Prisma } from '../generated/prisma/client';
+import { GetAllBookingParams } from '../validators/admin.schema';
 
-export async function listAllBookings() {
-  return prisma.booking.findMany({
-    orderBy: { createdAt: 'desc' },
-    include: {
-      tour: {
-        select: {
-          slug: true,
-          pricing: {
-            select: {
-              price: true,
-              minGroupSize: true,
-              maxGroupSize: true,
-              pricingType: true,
-              isGroupPrice: true,
-            },
+export async function listAllBookings({
+  endDate,
+  page = 1,
+  limit = 10,
+  search,
+  sort = 'createdAt:desc',
+  startDate,
+  status,
+  tourId,
+}: GetAllBookingParams) {
+  const safePage = Math.max(1, page);
+  const safeLimit = Math.min(50, limit);
+  const skip = (safePage - 1) * safeLimit;
+
+  const [sortField, sortOrder] = sort.split(':');
+
+  const orderBy = {
+    [sortField || 'createdAt']: sortOrder === 'asc' ? 'asc' : 'desc',
+  };
+
+  //build filters
+  const where: any = {};
+
+  if (tourId) where.tourId = tourId;
+  if (status) where.status = status;
+
+  if (startDate || endDate) {
+    where.startDate = {};
+    if (startDate) where.startDate.gte = startDate;
+    if (endDate) where.endDate.lte = endDate;
+  }
+
+  //search accross user and tour
+  if (search) {
+    where.OR = [
+      {
+        user: {
+          name: { contains: search, mode: 'insensitive' },
+        },
+      },
+      {
+        user: {
+          email: { contains: search, mode: 'insensitive' },
+        },
+      },
+      {
+        tour: {
+          name: { contains: search, mode: 'insensitive' },
+        },
+      },
+    ];
+  }
+
+  const [data, total] = await prisma.$transaction([
+    prisma.booking.findMany({
+      where,
+      skip,
+      take: safeLimit,
+      orderBy,
+      include: {
+        tour: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
           },
         },
       },
-      user: {
-        select: {
-          name: true,
-        },
-      },
+    }),
+    prisma.booking.count({ where }),
+  ]);
+
+  return {
+    data: data.map((b) => ({
+      id: b.id,
+      tourName: b.tour.name,
+      customerName: b.user.name ?? 'Guest',
+      email: b.user.email ?? '',
+      participants: b.participants,
+      pricingType: b.pricingType,
+      status: b.status,
+      totalPrice: b.totalPrice,
+      startDate: b.startDate,
+      endDate: b.endDate,
+      createdAt: b.createdAt,
+    })),
+
+    meta: {
+      total,
+      page: safePage,
+      pageSize: safeLimit,
+      pageCount: Math.ceil(total / safeLimit),
     },
-  });
+  };
 }
 
-export async function listMyBookings(userId: string) {
-  return prisma.booking.findMany({
-    where: { userId },
-    orderBy: { createdAt: 'desc' },
-    include: {
-      tour: {
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          pricing: {
-            select: { price: true },
+export async function listMyBookings({
+  userId,
+  endDate,
+  limit = 10,
+  page = 1,
+  startDate,
+  status,
+  upcoming = true,
+}: GetMyBookingsParamType) {
+  const safePage = Math.max(1, page);
+  const safeLimit = Math.min(20, limit);
+  const skip = (safePage - 1) * safeLimit;
+
+  const where: any = {
+    userId,
+  };
+
+  //filter by status
+  if (status) {
+    where.status = status;
+  }
+
+  if (upcoming) {
+    where.startDate = {
+      gte: new Date(),
+    };
+  }
+
+  //date range
+  if (startDate || endDate) {
+    where.startDate = {
+      ...(where.startDate || {}),
+      ...(startDate && { gte: startDate }),
+      ...(endDate && { lte: endDate }),
+    };
+  }
+
+  const [data, total] = await prisma.$transaction([
+    prisma.booking.findMany({
+      where,
+      skip,
+      take: safeLimit,
+      orderBy: {
+        startDate: 'asc',
+      },
+      include: {
+        tour: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
           },
         },
       },
+    }),
+    prisma.booking.count({ where }),
+  ]);
+
+  return {
+    data: data.map((b) => ({
+      id: b.id,
+      tourName: b.tour.name,
+      slug: b.tour.slug,
+      participants: b.participants,
+      pricingType: b.pricingType,
+      status: b.status,
+      totalPrice: b.totalPrice,
+      startDate: b.startDate,
+      endDate: b.endDate,
+      scheduleId: b.scheduleId,
+      createdAt: b.createdAt,
+    })),
+    meta: {
+      total,
+      page: safePage,
+      limit: safeLimit,
+      totalPages: Math.ceil(total / safeLimit),
     },
-  });
+  };
 }
 
 export async function getBookingById(bookingId: string) {

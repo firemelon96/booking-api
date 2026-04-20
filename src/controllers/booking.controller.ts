@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import {
   createBookingSchema,
+  getMyBookingsParams,
   rescheduleBookingSchema,
 } from '../validators/booking.schema';
 import {
@@ -42,7 +43,22 @@ export async function myBookings(req: Request, res: Response) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const bookings = await listMyBookings(req.user.userId);
+    const fields = getMyBookingsParams.safeParse(req.query);
+
+    if (!fields.success) {
+      return res.status(400).json({ error: 'Invalid fields' });
+    }
+
+    const bookings = await listMyBookings({
+      ...fields.data,
+      userId: req.user.userId,
+      startDate: fields.data.startDate
+        ? new Date(fields.data.startDate)
+        : undefined,
+      endDate: fields.data.endDate ? new Date(fields.data.endDate) : undefined,
+      page: Number(fields.data.page),
+      limit: Number(fields.data.limit),
+    });
     return res.json(bookings);
   } catch (err: any) {
     return res.status(400).json({ error: err.message });

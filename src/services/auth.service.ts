@@ -27,7 +27,7 @@ export async function loginUser(email: string, password: string) {
   }
 
   if (!user.password) {
-    throw new Error('User registered with Google. Please login with Google.');
+    throw new Error('Invalid credentials');
   }
 
   const isValid = await bcrypt.compare(password, user.password);

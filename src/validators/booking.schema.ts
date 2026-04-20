@@ -1,6 +1,11 @@
 import { schedule } from 'node-cron';
 import { z } from 'zod';
-import { CapacityMode, PricingType, TourType } from '../generated/prisma/enums';
+import {
+  BookingStatus,
+  CapacityMode,
+  PricingType,
+  TourType,
+} from '../generated/prisma/enums';
 
 export const createBookingSchema = z
   .object({
@@ -59,3 +64,15 @@ export const reserveSchema = z.object({
   scheduleId: z.string().optional(),
   excludeBookingId: z.string().optional(),
 });
+
+export const getMyBookingsParams = z.object({
+  userId: z.uuid(),
+  status: z.enum(BookingStatus).optional(),
+  upcoming: z.boolean().optional(),
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
+  page: z.number().optional(),
+  limit: z.number().optional(),
+});
+
+export type GetMyBookingsParamType = z.infer<typeof getMyBookingsParams>;

@@ -29,3 +29,10 @@ export async function login(req: Request, res: Response) {
     res.status(401).json({ error: err.message });
   }
 }
+
+export async function logout(req: Request, res: Response) {
+  try {
+  } catch (err: any) {
+    res.status(401).json({ error: err.message });
+  }
+}
