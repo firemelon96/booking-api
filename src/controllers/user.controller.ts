@@ -5,14 +5,13 @@ import {
   setProfileImage,
 } from '../services/user.service';
 
-export async function getUser(req: Request, res: Response) {
-  try {
-    const id = req.params.id;
-    if (Array.isArray(id)) {
-      throw new Error('Invalid id params');
-    }
+export async function getProfileDetail(req: Request, res: Response) {
+  const userId = req.user?.userId;
 
-    const user = await getUserById(id);
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    const user = await getUserById(userId);
     res.json(user);
   } catch (err: any) {
     res.status(400).json({ error: err.message });

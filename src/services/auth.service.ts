@@ -10,6 +10,7 @@ import {
   verifyGithubToken,
   verifyGoogleToken,
 } from '../config/oauth';
+import { sendResetPasswordEmail } from './email.service';
 
 export async function oauthVerifier({
   provider,
@@ -69,6 +70,7 @@ export async function register(email: string, password: string) {
 
   const user = await prisma.user.create({
     data: { email, password: hashed },
+    select: { email: true, role: true },
   });
 
   return user;
@@ -175,8 +177,7 @@ export async function forgotPassword(email: string) {
     },
   });
 
-  //TODO: Send email with rawToken
-  //await sendEmail(user.email, 'Password Reset', `Your token: ${rawToken}`);
+  await sendResetPasswordEmail(user.email, rawToken);
 
   return rawToken;
 }

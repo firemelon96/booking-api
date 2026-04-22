@@ -8,4 +8,4 @@ app.listen(env.PORT, () => {
 });
 
 startImageCleanupJob();
-expirePendingBooking();
+// expirePendingBooking();

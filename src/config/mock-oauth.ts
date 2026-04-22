@@ -3,7 +3,7 @@ export const mockVerifyOAuth = (token: string, provider: string) => {
   const fakeId = token || 'mock-user-123';
 
   return {
-    email: `${fakeId}@${provider}.mock`,
+    email: 'jamionestong@gmail.com',
     providerAccountId: `${provider}-${fakeId}`,
   };
 };

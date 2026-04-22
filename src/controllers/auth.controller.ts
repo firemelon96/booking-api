@@ -1,11 +1,6 @@
 import { Request, Response } from 'express';
 import { loginSchema, registerSchema } from '../validators/auth.schema';
 import * as AuthService from '../services/auth.service';
-import {
-  verifyAppleToken,
-  verifyGithubToken,
-  verifyGoogleToken,
-} from '../config/oauth';
 import { signAccessToken } from '../services/token.service';
 import { generateRefreshToken } from '../config/crypto';
 import { createSession } from '../services/session.service';
@@ -64,7 +59,7 @@ export async function login(req: Request, res: Response) {
 
     return res.json({ user });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.status(401).json({ error: err.message });
   }
 }
 
@@ -126,9 +121,17 @@ export async function register(req: Request, res: Response) {
 
   const { email, password } = validateFields.data;
 
-  const user = await AuthService.register(email, password);
+  try {
+    const user = await AuthService.register(email, password);
 
-  return res.json({ user });
+    return res.json({ user });
+  } catch (error: any) {
+    if (error.code === 'P2002') {
+      res.status(401).json({ error: 'Email already in use' });
+    }
+
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 }
 
 //TODO: Add forgot password and reset password controller + service
