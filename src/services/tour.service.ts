@@ -6,41 +6,7 @@ import groupBy from 'lodash.groupby';
 import { slugify } from '../utils/slugify';
 import { createFullTourSchema } from '../validators/tour.schema';
 import { createTourPricingSchema } from '../validators/tourPricing.schema';
-import { it } from 'node:test';
-
-// function rangesOverlap(aMin: number, aMax: number, bMin: number, bMax: number) {
-//   return Math.max(aMin, bMin) <= Math.min(aMax, bMax);
-// }
-
-// async function assertNoOverlap(data: {
-//   tourId: string;
-//   pricingType: PricingType;
-//   minGroupSize: number;
-//   maxGroupSize: number;
-// }) {
-//   const existing = await prisma.tourPricing.findMany({
-//     where: {
-//       tourId: data.tourId,
-//       pricingType: data.pricingType,
-//     },
-//     select: { id: true, minGroupSize: true, maxGroupSize: true },
-//   });
-
-//   const conflict = existing.find((p) =>
-//     rangesOverlap(
-//       data.minGroupSize,
-//       data.maxGroupSize,
-//       p.minGroupSize,
-//       p.maxGroupSize,
-//     ),
-//   );
-
-//   if (conflict) {
-//     throw new Error(
-//       `Pricing range overlaps with the existing range ${conflict.minGroupSize}-${conflict.maxGroupSize}`,
-//     );
-//   }
-// }
+import { GetAllTourParamsType } from '../validators/admin.schema';
 
 function validateNoOverlap(pricing: z.infer<typeof createTourPricingSchema>[]) {
   if (!pricing.length) {
@@ -402,4 +368,89 @@ export async function deleteTour(id: string) {
   await Promise.all(deletePromises);
 
   return prisma.tour.delete({ where: { id } });
+}
+
+export async function adminListAllTours({
+  page = 1,
+  limit = 10,
+  search,
+  sort = 'createdAt:desc',
+  capacityMode,
+  duration,
+  type,
+}: GetAllTourParamsType) {
+  const safePage = Math.max(1, page);
+  const safeLimit = Math.min(30, limit);
+  const skip = (safePage - 1) * safeLimit;
+
+  const [sortField, sortOrder] = sort?.split(':');
+
+  const orderBy = {
+    [sortField || 'createdAt']: sortOrder === 'asc' ? 'asc' : 'desc',
+  };
+
+  const where: any = {};
+
+  if (capacityMode) where.capacityMode = capacityMode;
+  if (duration) where.duration = duration;
+  if (type) where.type = type;
+
+  if (search) {
+    where.OR = [
+      {
+        name: {
+          contains: search,
+          mode: 'insensitive',
+        },
+      },
+      {
+        location: {
+          contains: search,
+          mode: 'insensitive',
+        },
+      },
+      {
+        slug: {
+          contains: search,
+          mode: 'insensitive',
+        },
+      },
+    ];
+  }
+
+  const [data, total] = await prisma.$transaction([
+    prisma.tour.findMany({
+      where,
+      skip,
+      take: safeLimit,
+      orderBy,
+      include: {
+        pricing: {
+          select: {
+            price: true,
+            pricingModel: true,
+          },
+        },
+      },
+    }),
+    prisma.tour.count({ where }),
+  ]);
+
+  return {
+    data: data.map((t) => ({
+      id: t.id,
+      tourName: t.name,
+      location: t.location,
+      duration: t.durationDays,
+      mode: t.capacityMode,
+      tourType: t.type,
+      startsAt: `${t.pricing[0].price} ${t.pricing[0].pricingModel}`,
+    })),
+    meta: {
+      total,
+      page: safePage,
+      pageSize: safeLimit,
+      pageCount: Math.ceil(total / safeLimit),
+    },
+  };
 }

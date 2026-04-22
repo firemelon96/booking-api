@@ -9,10 +9,7 @@ import {
 } from '../controllers/tour.controller';
 import { authenticate } from '../middlewares/auth.middleware';
 import { requireAdmin } from '../middlewares/role.middleware';
-import tourPricingRoutes from './tourPricing.routes';
-import availabilityRoutes from './availability.routes';
-import imageRoutes from './image.routes';
-import itineraryRoutes from './itinerary.routes';
+
 // import uploadRoutes from './upload.routes';
 /**
  * @swagger
@@ -72,20 +69,6 @@ import itineraryRoutes from './itinerary.routes';
 
 const router = Router();
 
-(router.get('/', list), router.get('/slug/:slug', getBySlug));
-
-// router.post('/', authenticate, requireAdmin, create);
-router.get('/id/:id', authenticate, requireAdmin, getById);
-router.post('/', authenticate, requireAdmin, createFullTour);
-router.patch('/:id', authenticate, requireAdmin, update);
-router.delete('/:id', authenticate, requireAdmin, remove);
-
-router.use('/:tourId/featured', imageRoutes);
-
-router.use('/:tourId/pricing', tourPricingRoutes);
-
-// router.use('/:tourId/availability', availabilityRoutes);
-
-router.use('/:tourId/itinerary', itineraryRoutes);
+(router.get('/', list), router.get('/:slug', getBySlug));
 
 export default router;

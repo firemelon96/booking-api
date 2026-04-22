@@ -5,7 +5,11 @@ import {
   upsertCapacity,
 } from '../services/capacity.service';
 import { listAllBookings } from '../services/booking.service';
-import { getAllBookingsParamsSchema } from '../validators/admin.schema';
+import {
+  getAllBookingsParamsSchema,
+  getAllTourParamsSchema,
+} from '../validators/admin.schema';
+import { adminListAllTours } from '../services/tour.service';
 
 export async function setCapacityController(req: Request, res: Response) {
   const { tourId, date, scheduleId, capacity } = req.body;
@@ -33,10 +37,22 @@ export async function bulkCapacityController(req: Request, res: Response) {
   res.json(result);
 }
 
+export async function blockDatesController(req: Request, res: Response) {
+  const { tourId, startDate, endDate, scheduleId } = req.body;
+  const result = await blockDates({
+    startDate,
+    endDate,
+    tourId,
+    scheduleId,
+  });
+
+  res.json(result);
+}
+
 export async function getAdminBookingsController(req: Request, res: Response) {
   const fields = getAllBookingsParamsSchema.safeParse(req.query);
 
-  if (!fields.success) return res.status(500).json({ error: 'Invalid fields' });
+  if (!fields.success) return res.status(403).json({ error: 'Invalid fields' });
 
   const bookings = await listAllBookings({
     ...fields.data,
@@ -50,14 +66,25 @@ export async function getAdminBookingsController(req: Request, res: Response) {
   res.json(bookings);
 }
 
-export async function blockDatesController(req: Request, res: Response) {
-  const { tourId, startDate, endDate, scheduleId } = req.body;
-  const result = await blockDates({
-    startDate,
-    endDate,
-    tourId,
-    scheduleId,
+export async function adminGetAllTours(req: Request, res: Response) {
+  const validateFields = getAllTourParamsSchema.safeParse(req.query);
+
+  if (!validateFields.success) {
+    return res.status(403).json({ error: 'Invalid fields' });
+  }
+
+  const { capacityMode, duration, limit, page, search, sort, type } =
+    validateFields.data;
+
+  const tours = await adminListAllTours({
+    capacityMode,
+    duration,
+    limit,
+    page,
+    search,
+    sort,
+    type,
   });
 
-  res.json(result);
+  res.json(tours);
 }

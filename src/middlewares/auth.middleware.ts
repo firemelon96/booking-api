@@ -1,25 +1,19 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-import { env } from '../config/env';
+import { verifyAccessToken } from '../services/token.service';
+import { Role } from '../generated/prisma/enums';
 
 interface JwtPayLoad {
   userId: string;
-  role: 'USER' | 'ADMIN';
+  role: Role;
 }
 
 export function authenticate(req: Request, res: Response, next: NextFunction) {
-  const header = req.headers.authorization;
-  if (!header) {
-    return res.status(401).json({ error: 'Missing token' });
-  }
+  const token = req.cookies?.accessToken;
 
-  const token = header.split(' ')[1];
-  if (!token) {
-    return res.status(401).json({ error: 'Invalid token format' });
-  }
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
 
   try {
-    const decoded = jwt.verify(token, env.JWT_SECRET) as JwtPayLoad;
+    const decoded = verifyAccessToken(token) as JwtPayLoad;
     req.user = decoded;
     next();
   } catch {

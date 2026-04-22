@@ -17,67 +17,108 @@ datasource db {
 // USER TABLE
 //================================
 model User {
-  id       String   @id @default(uuid())
-  email    String   @unique
+  id       String  @id @default(uuid())
+  email    String  @unique
   password String?
-  googleId String?  @unique
-  name    String?
-  role     Role     @default(USER)
+  role     Role    @default(USER)
 
-  profileImageId  String? @unique
-  profileImage  Image? @relation("UserProfileImage",fields: [profileImageId], references: [id])
+  profileImageId String? @unique
+  profileImage   Image?  @relation("UserProfileImage", fields: [profileImageId], references: [id])
+
+  accounts Account[]
+  sessions Session[]
+  passwordResetTokens PasswordResetToken[]
 
   bookings Booking[]
-  reviews   Review[]
+  reviews  Review[]
+
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+}
+
+model Account {
+  id                String  @id @default(uuid())
+  userId            String
+  provider          String
+  providerAccountId String
+  accessToken       String?
+  refreshToken      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  refreshToken String   @unique
+  ip           String?
+  userAgent    String?
+  expiresAt    DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 //================================
 // TOUR TABLES
 //================================
 model Tour {
-  id      String        @id @default(uuid())
-  name    String
-  slug    String        @unique
-  joinerCapacity Int @default(12)
+  id             String @id @default(uuid())
+  name           String
+  slug           String @unique
+  joinerCapacity Int    @default(12)
 
-  description String
-  highlights String[]
-  inclusions String[]
-  exclusions String[]
-  location    String
-  durationDays    Int? //For day tours, this will be null. For package tours, this will be the total duration of the tour in days.
-  capacityMode  CapacityMode @default(EXCLUSIVE)
-  type       TourType  @default(DAY) 
-  timezone  String @default("Asia/Manila") 
+  description  String
+  highlights   String[]
+  inclusions   String[]
+  exclusions   String[]
+  location     String
+  durationDays Int? //For day tours, this will be 1 day. For package tours, this will be the total duration of the tour in days.
+  capacityMode CapacityMode @default(EXCLUSIVE)
+  type         TourType     @default(DAY)
+  timezone     String       @default("Asia/Manila")
 
-  schedules   TourScheduleOption[] //For package tours, this will be empty and the schedule will be determined by the itinerary.
-  itinerary Itinerary?
-  images  Image[]
-  pricing TourPricing[]
-  bookings Booking[]
-  reviews Review[]
-  availability TourAvailability[]
+  schedules          TourScheduleOption[] //For package tours, this will be empty and the schedule will be determined by the itinerary.
+  itinerary          Itinerary?
+  images             Image[]
+  pricing            TourPricing[]
+  reviews            Review[]
+  availability       TourAvailability[]
   cancellationPolicy CancellationPolicy?
-  capacity TourDailyCapacity[]
+  capacity           TourDailyCapacity[]
+  
+  bookings           Booking[]
 
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 //================================
 // AVAILABILITY TABLE
 //================================
 model TourAvailability {
-  id      String      @id @default(uuid())
-  date    DateTime
+  id   String   @id @default(uuid())
+  date DateTime
 
-  isClosed    Boolean     @default(false) //If true, the tour is not available for booking on this date. This can be used for maintenance, fully booked dates, etc.
-  tourId  String
-  reason  String? //e.g. "Maintenance", "Fully Booked", etc.
-  tour    Tour        @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  isClosed Boolean @default(false) //If true, the tour is not available for booking on this date. This can be used for maintenance, fully booked dates, etc.
+  tourId   String
+  reason   String? //e.g. "Maintenance", "Fully Booked", etc.
+  tour     Tour    @relation(fields: [tourId], references: [id], onDelete: Cascade)
 
+  createdAt DateTime @default(now())
 
-  createdAt DateTime    @default(now())
   @@unique([tourId, date])
 }
 
@@ -85,19 +126,19 @@ model TourAvailability {
 // TOUR DAILY CAPACITY
 //===============================
 model TourDailyCapacity {
-  id      String    @id @default(uuid())
+  id String @id @default(uuid())
 
-  date    DateTime
-  capacity  Int
-  booked    Int     @default(0)// current used slots
+  date     DateTime
+  capacity Int
+  booked   Int      @default(0) // current used slots
 
-  scheduleId  String?
-  schedule  TourScheduleOption? @relation(fields: [scheduleId], references: [id])
+  scheduleId String?
+  schedule   TourScheduleOption? @relation(fields: [scheduleId], references: [id])
 
   scheduleKey String
 
-  tourId  String
-  tour Tour @relation(fields: [tourId], references: [id])
+  tourId String
+  tour   Tour   @relation(fields: [tourId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -109,117 +150,117 @@ model TourDailyCapacity {
 // SCHEDULE TABLE
 //================================
 model TourScheduleOption {
-  id      String      @id @default(uuid())
+  id String @id @default(uuid())
 
-  tourId  String
-  tour    Tour        @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  tourId String
+  tour   Tour   @relation(fields: [tourId], references: [id], onDelete: Cascade)
 
-  label String
+  label     String
   startTIme String?
   endTime   String?
 
-  capacity  Int?
+  capacity Int?
 
   schedules TourDailyCapacity[]
-  bookings Booking[]
+  bookings  Booking[]
 
-  createdAt DateTime    @default(now())
+  createdAt DateTime @default(now())
 }
 
 //================================
 // ITINERARY TABLES
 //================================
 model Itinerary {
-  id      String      @id @default(uuid())
-  days    ItineraryDay[]
+  id   String         @id @default(uuid())
+  days ItineraryDay[]
 
-  tourId  String  @unique
-  tour    Tour        @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  tourId String @unique
+  tour   Tour   @relation(fields: [tourId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model ItineraryDay {
-  id          String      @id @default(uuid())
-  dayNumber   Int
-  title       String?
+  id        String  @id @default(uuid())
+  dayNumber Int
+  title     String?
 
   itineraryId String
-  itinerary   Itinerary    @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+  itinerary   Itinerary @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
 
-  items       ItineraryItem[]
+  items ItineraryItem[]
 
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model ItineraryItem {
-  id          String      @id @default(uuid())
-  time   String //Can be a specific time (e.g. 9:00 AM) or a time range (e.g. 9:00 AM - 11:00 AM) or a general time of day (e.g. Morning, Afternoon, Evening)
+  id          String  @id @default(uuid())
+  time        String //Can be a specific time (e.g. 9:00 AM) or a time range (e.g. 9:00 AM - 11:00 AM) or a general time of day (e.g. Morning, Afternoon, Evening)
   title       String
   description String?
 
-  order       Int
+  order Int
 
   dayId String
   day   ItineraryDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 //================================
 // IMAGE TABLES
 //================================
 model Image {
-  id          String      @id @default(uuid())
-  url         String
-  publicId    String
-  isFeatured  Boolean     @default(false)
+  id         String  @id @default(uuid())
+  url        String
+  publicId   String
+  isFeatured Boolean @default(false)
 
-  type        ImageType
-  status      ImageStatus @default(TEMP) //for cleanup
+  type   ImageType
+  status ImageStatus @default(TEMP) //for cleanup
 
-  tourId      String?
- 
+  tourId String?
+
   userProfile User? @relation("UserProfileImage")
 
-  tour        Tour?       @relation(fields: [tourId], references: [id], onDelete: Cascade)
-  createdAt   DateTime    @default(now())
+  tour      Tour?    @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
 }
 
 //================================
 // PRICING TABLES
 //================================
 model TourPricing {
-  id           String   @id @default(uuid())
+  id String @id @default(uuid())
 
-  tourId       String
-  tour         Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  tourId String
+  tour   Tour   @relation(fields: [tourId], references: [id], onDelete: Cascade)
 
-  pricingType  PricingType
-  
+  pricingType PricingType
+
   pricingModel PricingModel
 
-  price        Float
+  price Float
 
   minGroupSize Int
   maxGroupSize Int
-  
-  createdAt DateTime    @default(now())
+
+  createdAt DateTime @default(now())
 }
 
 model CancellationPolicy {
-  id          String   @id @default(uuid())
+  id          String @id @default(uuid())
   description String
 
   freeCancellationHours Int //Number of hours before the tour start time that cancellation is free. For example, if this is 24, then cancellation is free if done at least 24 hours before the tour start time.
-  partialRefundHours Int //Number of hours before the tour start time that partial refund is given. For example, if this is 12, then partial refund is given if cancellation is done at least 12 hours before the tour start time but less than 24 hours before the tour start time.
-  refundPercentage Int //Percentage of the total price that will be refunded for cancellations that qualify for partial refund. For example, if this is 50, then 50% of the total price will be refunded for cancellations that qualify for partial refund.
-  
-  tourId      String  @unique
-  tour        Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  partialRefundHours    Int //Number of hours before the tour start time that partial refund is given. For example, if this is 12, then partial refund is given if cancellation is done at least 12 hours before the tour start time but less than 24 hours before the tour start time.
+  refundPercentage      Int //Percentage of the total price that will be refunded for cancellations that qualify for partial refund. For example, if this is 50, then 50% of the total price will be refunded for cancellations that qualify for partial refund.
+
+  tourId String @unique
+  tour   Tour   @relation(fields: [tourId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -229,24 +270,24 @@ model CancellationPolicy {
 // BOOKING TABLES
 //================================
 model Booking {
-  id        String   @id @default(uuid())
-  
-  userId    String
-  tourId    String
+  id String @id @default(uuid())
 
-  pricingType PricingType
+  userId String
+  tourId String
+
+  pricingType  PricingType
   participants Int
-  notes       String?
+  notes        String?
 
-  totalPrice     Float
-  status         BookingStatus @default(PENDING)
+  totalPrice Float
+  status     BookingStatus @default(PENDING)
 
   startDate DateTime
   endDate   DateTime?
 
-  rescheduleCount Int @default(0)
+  rescheduleCount    Int       @default(0)
   lastRescheduleDate DateTime?
-  canceledAt DateTime?
+  canceledAt         DateTime?
 
   expiresAt DateTime?
 
@@ -257,9 +298,9 @@ model Booking {
   scheduleId String? //For package tours, this will be null and the schedule will be determined by the itinerary.
 
   payment Payment?
-  
-  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
-  tour Tour @relation(fields: [tourId], references: [id], onDelete: Restrict)
+
+  user     User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  tour     Tour                @relation(fields: [tourId], references: [id], onDelete: Restrict)
   schedule TourScheduleOption? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
 
   logs BookingAuditLog[]
@@ -274,16 +315,16 @@ model Booking {
 //BOOKING HISTORY TABLES
 //================================
 model BookingAuditLog {
-  id          String   @id @default(uuid())
-  bookingId   String
-  actorId      String //userid
-  actorType      Role //USER or ADMIN
-  action      BookingAction //e.g. CREATED, RESCHEDULED, CANCELLED
-  previousValue  Json? //e.g. previous start date for rescheduling, or previous status for cancellation
+  id            String        @id @default(uuid())
+  bookingId     String
+  actorId       String //userid
+  actorType     Role //USER or ADMIN
+  action        BookingAction //e.g. CREATED, RESCHEDULED, CANCELLED
+  previousValue Json? //e.g. previous start date for rescheduling, or previous status for cancellation
   newValue      Json? //e.g. new start date for rescheduling, or new status for cancellation
-  reason       String? //for cancellation or rescheduling
+  reason        String? //for cancellation or rescheduling
 
-  timestamp   DateTime @default(now())
+  timestamp DateTime @default(now())
 
   createdAt DateTime @default(now())
 
@@ -294,11 +335,11 @@ model BookingAuditLog {
 // PAYMENT TABLES
 //================================
 model Payment {
-  id          String   @id @default(uuid())
-  bookingId   String  @unique
-  xenditInvoiceId      String
-  invoiceUrl   String
-  status      PaymentStatus @default(PENDING)
+  id              String        @id @default(uuid())
+  bookingId       String        @unique
+  xenditInvoiceId String
+  invoiceUrl      String
+  status          PaymentStatus @default(PENDING)
 
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 }
@@ -307,61 +348,60 @@ model Payment {
 // REVIEW TABLES
 //================================
 model Review {
-  id    String @id @default(uuid())
-  starRating  Int
-  comment     String
+  id         String @id @default(uuid())
+  starRating Int
+  comment    String
   // imageIds    String[]
 
-  userId    String
-  tourId    String
+  userId String
+  tourId String
 
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tour    Tour    @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tour Tour @relation(fields: [tourId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
+  updatedAt DateTime @updatedAt
 }
 
 model Hotel {
-  id        String @id  @default(uuid())
-  name      String  @unique
-  address   String
+  id          String   @id @default(uuid())
+  name        String   @unique
+  address     String
   description String
-  amenities String[]
+  amenities   String[]
 
-  rooms     Room[]
-  policies  Policy[]
+  rooms    Room[]
+  policies Policy[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model Room {
-  id        String @id  @default(uuid())
-  name      String  @unique
-  description String
-  baseRate  Float
-  maxOccupancy  Int
-  roomType  RoomType
-  bedType BedType
+  id              String   @id @default(uuid())
+  name            String   @unique
+  description     String
+  baseRate        Float
+  maxOccupancy    Int
+  roomType        RoomType
+  bedType         BedType
   extraPersonRate Int
 
-  hotelId   String
+  hotelId String
 
-  hotel   Hotel @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 }
 
 model Policy {
-  id        String @id @default(uuid())
-  checkIn   String
-  checkOut  String
-  cancellation  String
-  child     String
-  reservation String
-  pet String
+  id           String @id @default(uuid())
+  checkIn      String
+  checkOut     String
+  cancellation String
+  child        String
+  reservation  String
+  pet          String
 
   hotelId String
 
@@ -370,7 +410,6 @@ model Policy {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
-
 
 //================================
 // ENUMS
@@ -458,4 +497,3 @@ enum PaymentStatus {
   EXPIRED
   FAILED
 }
-
