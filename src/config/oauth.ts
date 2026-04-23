@@ -7,9 +7,12 @@ export async function verifyGoogleToken(idToken: string) {
     `https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`,
   );
 
+  //TODO: add return type chheck for email verified by provider
+
   return {
     email: res.data.email,
     providerAccountId: res.data.sub,
+    emailVerified: res.data.email_verified,
   };
 }
 
@@ -21,6 +24,7 @@ export async function verifyAppleToken(identityToken: string) {
   return {
     email: decoded.email,
     providerAccountId: decoded.sub,
+    emailVerified: decoded.verified,
   };
 }
 
@@ -34,5 +38,6 @@ export async function verifyGithubToken(accessToken: string) {
   return {
     email: res.data.email,
     providerAccountId: res.data.id.toString(),
+    emailVerified: false,
   };
 }

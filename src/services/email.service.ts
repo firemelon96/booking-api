@@ -21,3 +21,19 @@ export async function sendResetPasswordEmail(email: string, token: string) {
     html,
   });
 }
+
+export async function sendVerificationEmail(email: string, token: string) {
+  const url = `${process.env.APP_URL}/verify-email?token=${token}`;
+
+  const html = `
+    <h2>Verify your email</h2>
+    <p>Click the link below:</p>
+    <a href="${url}">${url}</a>
+  `;
+
+  await sendEmail({
+    to: email,
+    subject: 'Verify your email',
+    html,
+  });
+}

@@ -21,6 +21,7 @@ model User {
   email    String  @unique
   password String?
   role     Role    @default(USER)
+  emailVerified Boolean @default(false)
 
   profileImageId String? @unique
   profileImage   Image?  @relation("UserProfileImage", fields: [profileImageId], references: [id])
@@ -28,6 +29,7 @@ model User {
   accounts Account[]
   sessions Session[]
   passwordResetTokens PasswordResetToken[]
+  emailVerifications  EmailVerificationToken[]
 
   bookings Booking[]
   reviews  Review[]
@@ -69,6 +71,15 @@ model PasswordResetToken {
   expiresAt DateTime
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model EmailVerificationToken {
+  id  String @id @default(uuid())
+  token String @unique
+  userId  String
+  expiresAt DateTime
+
+  user  User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 //================================

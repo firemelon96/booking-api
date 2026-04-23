@@ -10,7 +10,7 @@ import {
   verifyGithubToken,
   verifyGoogleToken,
 } from '../config/oauth';
-import { sendResetPasswordEmail } from './email.service';
+import { sendResetPasswordEmail, sendVerificationEmail } from './email.service';
 
 export async function oauthVerifier({
   provider,
@@ -34,16 +34,45 @@ export async function oauthLogin({
   email,
   provider,
   providerAccountId,
+  emailVerified,
 }: {
   email: string;
   provider: string;
   providerAccountId: string;
+  emailVerified: boolean;
 }) {
+  if (!emailVerified) {
+    throw new Error('Oauth email not verified');
+  }
+
+  const existingAccount = await prisma.account.findUnique({
+    where: {
+      provider_providerAccountId: {
+        provider,
+        providerAccountId,
+      },
+    },
+    include: {
+      user: true,
+    },
+  });
+
+  if (existingAccount) return existingAccount.user;
+
   let user = await prisma.user.findUnique({ where: { email } });
+
+  //TODO: skip email verification if provider is provided
 
   if (!user) {
     user = await prisma.user.create({
-      data: { email },
+      data: { email, emailVerified: true },
+    });
+  }
+
+  if (user && !user.emailVerified) {
+    user = await prisma.user.update({
+      where: { email },
+      data: { emailVerified: true },
     });
   }
 
@@ -66,14 +95,72 @@ export async function oauthLogin({
 }
 
 export async function register(email: string, password: string) {
-  const hashed = await bcrypt.hash(password, 10);
+  const hashedPassword = await bcrypt.hash(password, 10);
 
   const user = await prisma.user.create({
-    data: { email, password: hashed },
-    select: { email: true, role: true },
+    data: { email, password: hashedPassword },
+    select: { id: true, email: true, role: true },
   });
 
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const hashed = hashToken(rawToken);
+
+  await prisma.emailVerificationToken.create({
+    data: {
+      userId: user.id,
+      token: hashed,
+      expiresAt: new Date(Date.now() + 1000 * 60 * 60),
+    },
+  });
+
+  //send email
+  await sendVerificationEmail(user.email, rawToken);
+
   return user;
+}
+
+export async function resendVerification(email: string) {
+  const user = await prisma.user.findUnique({ where: { email } });
+
+  if (!user || user.emailVerified) return;
+
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const hashed = hashToken(rawToken);
+
+  await prisma.emailVerificationToken.create({
+    data: {
+      userId: user.id,
+      token: hashed,
+      expiresAt: new Date(Date.now() + 1000 * 60 * 60),
+    },
+  });
+
+  await sendVerificationEmail(user.email, rawToken);
+}
+
+export async function verifyEmail(token: string) {
+  const hashed = hashToken(token);
+
+  const record = await prisma.emailVerificationToken.findUnique({
+    where: { token: hashed },
+  });
+
+  if (!record || record.expiresAt < new Date()) {
+    throw new Error('Invalid or expired token');
+  }
+
+  await prisma.user.update({
+    where: {
+      id: record.userId,
+    },
+    data: { emailVerified: true },
+  });
+
+  await prisma.emailVerificationToken.delete({
+    where: { id: record.id },
+  });
+
+  return true;
 }
 
 export async function login(
@@ -84,6 +171,10 @@ export async function login(
   const user = await prisma.user.findUnique({
     where: { email },
   });
+
+  if (!user?.emailVerified) {
+    throw new Error('Please verify your email before logging in');
+  }
 
   if (!user || !user.password) {
     throw new Error('Invalid credentials');

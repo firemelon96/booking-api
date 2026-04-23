@@ -104,5 +104,7 @@ router.post('/refresh', AuthController.refreshToken);
 
 router.post('/forgot-password', AuthController.forgotPassword);
 router.post('/reset-password', AuthController.resetPassword);
+router.post('/verify-email', AuthController.verifyEmail);
+router.post('/resend-verification', AuthController.resendVerification);
 
 export default router;

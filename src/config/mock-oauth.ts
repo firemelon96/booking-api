@@ -5,5 +5,6 @@ export const mockVerifyOAuth = (token: string, provider: string) => {
   return {
     email: 'jamionestong@gmail.com',
     providerAccountId: `${provider}-${fakeId}`,
+    emailVerified: true,
   };
 };

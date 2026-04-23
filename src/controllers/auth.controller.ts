@@ -15,6 +15,7 @@ export async function oauth(req: Request, res: Response) {
     email: profile?.email,
     provider,
     providerAccountId: profile?.providerAccountId,
+    emailVerified: profile.emailVerified,
   });
 
   const accessToken = signAccessToken({
@@ -134,7 +135,35 @@ export async function register(req: Request, res: Response) {
   }
 }
 
-//TODO: Add forgot password and reset password controller + service
+export async function verifyEmail(req: Request, res: Response) {
+  const { token } = req.query;
+
+  if (typeof token !== 'string') {
+    return res.status(400).json({ error: 'Invalid token' });
+  }
+
+  try {
+    await AuthService.verifyEmail(token);
+    return res.json({ success: true });
+  } catch (error) {
+    res.status(500).json('Internal server error');
+  }
+}
+
+export async function resendVerification(req: Request, res: Response) {
+  const { email } = req.body;
+
+  try {
+    await AuthService.resendVerification(email);
+
+    return res.json({
+      success: true,
+    });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+}
+
 export async function forgotPassword(req: Request, res: Response) {
   const { email } = req.body;
 
