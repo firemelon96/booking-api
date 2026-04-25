@@ -60,7 +60,7 @@ export async function login(req: Request, res: Response) {
 
     return res.json({ user });
   } catch (err: any) {
-    res.status(401).json({ error: err.message });
+    res.status(400).json({ error: err.message });
   }
 }
 
@@ -136,15 +136,11 @@ export async function register(req: Request, res: Response) {
 }
 
 export async function verifyEmail(req: Request, res: Response) {
-  const { token } = req.query;
-
-  if (typeof token !== 'string') {
-    return res.status(400).json({ error: 'Invalid token' });
-  }
+  const token = req.query.token as string;
 
   try {
     await AuthService.verifyEmail(token);
-    return res.json({ success: true });
+    return res.status(200).json({ success: true });
   } catch (error) {
     res.status(500).json('Internal server error');
   }
