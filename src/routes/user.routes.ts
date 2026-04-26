@@ -9,7 +9,4 @@ const router = Router();
 router.get('/', authenticate, getProfileDetail);
 router.patch('/:id/profile-image', authenticate, setProfile);
 
-//bookings
-router.use('/bookings', bookingRoutes);
-
 export default router;

@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../middlewares/auth.middleware';
 import * as ctrl from '../controllers/booking.controller';
-import { requireAdmin } from '../middlewares/role.middleware';
 
 const router = Router();
 

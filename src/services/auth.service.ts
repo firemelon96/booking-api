@@ -213,7 +213,10 @@ export async function logoutAllSession(userId: string) {
   });
 }
 
-export async function refreshSession(oldRefreshToken: string) {
+export async function refreshSession(
+  oldRefreshToken: string,
+  meta: { ip?: string; userAgent?: string },
+) {
   const hashed = hashToken(oldRefreshToken);
 
   const session = await prisma.session.findUnique({
@@ -233,14 +236,11 @@ export async function refreshSession(oldRefreshToken: string) {
 
   const newRefreshToken = generateRefreshToken();
 
-  await prisma.session.create({
-    data: {
-      userId: session.user.id,
-      refreshToken: hashToken(newAccessToken),
-      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
-      ip: session.ip,
-      userAgent: session.userAgent,
-    },
+  await createSession({
+    refreshToken: newRefreshToken,
+    userId: session.user.id,
+    ip: meta.ip,
+    userAgent: meta.userAgent,
   });
 
   return {

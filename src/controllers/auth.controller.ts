@@ -71,13 +71,20 @@ export async function refreshToken(req: Request, res: Response) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const { accessToken, refreshToken: newRefreshToken } =
-    await AuthService.refreshSession(refreshToken);
+  try {
+    const { accessToken, refreshToken: newRefreshToken } =
+      await AuthService.refreshSession(refreshToken, {
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
 
-  res.cookie('accessToken', accessToken, accessCookieOptions);
-  res.cookie('refreshToken', newRefreshToken, refreshCookieOptions);
+    res.cookie('accessToken', accessToken, accessCookieOptions);
+    res.cookie('refreshToken', newRefreshToken, refreshCookieOptions);
 
-  return res.json({ success: true });
+    return res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
 }
 
 export async function logout(req: Request, res: Response) {

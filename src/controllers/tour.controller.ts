@@ -52,13 +52,13 @@ export async function getById(req: Request, res: Response) {
 
 export async function createFullTour(req: Request, res: Response) {
   try {
-    const data = createFullTourSchema.parse(req.body);
+    const validFields = createFullTourSchema.safeParse(req.body);
 
-    if (!data) {
+    if (!validFields.success) {
       throw new Error('Invalid fields');
     }
 
-    const tourCreate = await createFullTourService(data);
+    const tourCreate = await createFullTourService(validFields.data);
 
     res.status(201).json(tourCreate);
   } catch (error: any) {

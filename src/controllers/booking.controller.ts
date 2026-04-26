@@ -38,6 +38,8 @@ export async function create(req: Request, res: Response) {
 }
 
 export async function myBookings(req: Request, res: Response) {
+  const isAdmin = req.user?.role === 'ADMIN';
+
   try {
     if (!req.user?.userId) {
       return res.status(401).json({ error: 'Unauthorized' });
