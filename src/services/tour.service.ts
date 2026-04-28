@@ -4,7 +4,11 @@ import { prisma } from '../config/prisma';
 import groupBy from 'lodash.groupby';
 
 import { slugify } from '../utils/slugify';
-import { createFullTourSchema } from '../validators/tour.schema';
+import {
+  createFullTourSchema,
+  CreateTourType,
+  UpdateTourType,
+} from '../validators/tour.schema';
 import { createTourPricingSchema } from '../validators/tourPricing.schema';
 import { GetAllTourParamsType } from '../validators/admin.schema';
 
@@ -216,24 +220,28 @@ export async function updateTourImages(
 }
 
 export async function updateTour(
-  id: string,
-  input: Partial<{
-    name: string;
-    slug?: string;
-    description: string;
-    location: string;
-    exclusions: string[];
-    inclusions: string[];
-    types: 'DAY' | 'PACKAGE';
-  }>,
+  params: Partial<UpdateTourType & { tourId: string }>,
 ) {
-  const existingTour = await prisma.tour.findUnique({ where: { id } });
+  const tour = await prisma.tour.findUnique({ where: { id: params.tourId } });
 
-  if (!existingTour) throw new Error('Tour not found');
+  if (!tour) throw new Error('Tour not found');
 
-  const nextSlug = input.slug ?? (input.name ? slugify(input.name) : undefined);
+  if (params.type === 'DAY' && tour.durationDays && tour.durationDays > 1) {
+    throw new Error('Invalid duration for day type');
+  }
 
-  if (nextSlug && nextSlug !== existingTour.slug) {
+  if (
+    params.type === 'PACKAGE' &&
+    tour.durationDays &&
+    tour.durationDays <= 1
+  ) {
+    throw new Error('Invalid duration for package tour');
+  }
+
+  const nextSlug =
+    params.slug ?? (params.name ? slugify(params.name) : undefined);
+
+  if (nextSlug && nextSlug !== tour.slug) {
     const slugExists = await prisma.tour.findUnique({
       where: { slug: nextSlug },
     });
@@ -241,20 +249,18 @@ export async function updateTour(
   }
 
   const data = Object.fromEntries(
-    Object.entries({ ...input, slug: nextSlug }).filter(
+    Object.entries({ ...params, slug: nextSlug }).filter(
       ([_, value]) => value !== undefined,
     ),
   );
 
   return prisma.tour.update({
-    where: { id },
+    where: { id: params.tourId },
     data,
   });
 }
 
-export async function createFullTourService(
-  data: z.infer<typeof createFullTourSchema>,
-) {
+export async function createFullTourService(data: CreateTourType) {
   const {
     name,
     description,
@@ -262,11 +268,43 @@ export async function createFullTourService(
     exclusions,
     inclusions,
     imageIds,
+    capacityMode,
+    type,
     itinerary,
     pricing,
+    durationDays,
   } = data;
 
   const slug = slugify(name);
+
+  const pricingType = new Set(pricing.map((p) => p.pricingType));
+
+  if (type === 'DAY') {
+    if (durationDays && durationDays > 1) throw new Error('Invalid duration');
+
+    if (itinerary.length > 1) throw new Error('Invalid number of itinerary');
+  }
+
+  if (type === 'PACKAGE') {
+    if (durationDays && durationDays <= 1) throw new Error('Invalid duration');
+
+    if (itinerary.length !== durationDays)
+      throw new Error('Invalid number of itinerary');
+  }
+
+  if (capacityMode === 'EXCLUSIVE' && pricingType.has('JOINER')) {
+    throw new Error('Exclusive tour invalid pricing type');
+  }
+
+  if (capacityMode === 'SHARED' && pricingType.has('PRIVATE')) {
+    throw new Error('Invalid shared pricing type');
+  }
+
+  if (capacityMode === 'MIXED') {
+    if (!pricingType.has('JOINER') || !pricingType.has('PRIVATE')) {
+      throw new Error('Pricing type must include both joiner and private');
+    }
+  }
 
   const exists = await prisma.tour.findUnique({ where: { slug } });
 
@@ -288,12 +326,15 @@ export async function createFullTourService(
     //create tour
     const tour = await tx.tour.create({
       data: {
-        name,
         slug,
         description,
         location,
+        name,
+        durationDays,
         exclusions,
         inclusions,
+        capacityMode,
+        type,
       },
     });
 
@@ -334,6 +375,144 @@ export async function createFullTourService(
       data: pricing.map((p) => ({
         ...p,
         tourId: tour.id,
+      })),
+    });
+
+    //assign imageIds
+    if (imageIds.length) {
+      await tx.image.updateMany({
+        where: { id: { in: imageIds } },
+        data: {
+          tourId: tour.id,
+          status: 'ACTIVE',
+          type: 'TOUR',
+        },
+      });
+    }
+
+    return tour;
+  });
+}
+
+export async function updateFullTourService(
+  data: z.infer<typeof createFullTourSchema> & { tourId: string },
+) {
+  const {
+    name,
+    description,
+    location,
+    exclusions,
+    inclusions,
+    imageIds,
+    capacityMode,
+    type,
+    itinerary,
+    pricing,
+    durationDays,
+    tourId,
+  } = data;
+
+  const slug = slugify(name);
+
+  const pricingType = new Set(pricing.map((p) => p.pricingType));
+
+  const tour = await prisma.tour.findUnique({ where: { id: tourId } });
+
+  if (!tour) {
+    throw new Error('Tour not found.');
+  }
+
+  if (type === 'DAY') {
+    if (durationDays && durationDays > 1) throw new Error('Invalid duration');
+
+    if (itinerary.length > 1) throw new Error('Invalid number of itinerary');
+  }
+
+  if (type === 'PACKAGE') {
+    if (durationDays && durationDays <= 1) throw new Error('Invalid duration');
+
+    if (itinerary.length !== durationDays)
+      throw new Error('Invalid number of itinerary');
+  }
+
+  if (capacityMode === 'EXCLUSIVE' && pricingType.has('JOINER')) {
+    throw new Error('Exclusive tour invalid pricing type');
+  }
+
+  if (capacityMode === 'SHARED' && pricingType.has('PRIVATE')) {
+    throw new Error('Invalid shared pricing type');
+  }
+
+  if (capacityMode === 'MIXED') {
+    if (!pricingType.has('JOINER') || !pricingType.has('PRIVATE')) {
+      throw new Error('Pricing type must include both joiner and private');
+    }
+  }
+
+  validateNoOverlap(pricing);
+
+  if (!itinerary.length && pricing.length > 0) {
+    throw new Error('Itinerary is required when pricing is provided');
+  }
+
+  if (itinerary.length && pricing.length === 0) {
+    throw new Error('Pricing is required when itinerary is provided');
+  }
+
+  return prisma.$transaction(async (tx) => {
+    //create tour
+    const tour = await tx.tour.update({
+      where: { id: tourId },
+      data: {
+        name,
+        slug,
+        description,
+        location,
+        exclusions,
+        inclusions,
+        durationDays,
+        capacityMode,
+        type,
+      },
+    });
+
+    //create itineraries
+
+    await tx.itinerary.update({
+      where: { tourId },
+      data: {
+        days: {
+          create: itinerary.map((day) => ({
+            dayNumber: day.dayNumber,
+            title: day.title,
+            items: {
+              create: day.items.map((item, index) => ({
+                time: item.time,
+                title: item.title,
+                description: item.description,
+                order: index,
+              })),
+            },
+          })),
+        },
+      },
+      include: {
+        days: {
+          orderBy: { dayNumber: 'asc' },
+          include: {
+            items: {
+              orderBy: { order: 'asc' },
+            },
+          },
+        },
+      },
+    });
+
+    //Create pricing
+    await tx.tourPricing.updateMany({
+      where: { tourId },
+      data: pricing.map((p) => ({
+        ...p,
       })),
     });
 

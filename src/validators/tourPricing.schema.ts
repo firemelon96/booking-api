@@ -16,23 +16,28 @@ export const createTourPricingSchema = z
     path: ['minGroupSize'],
   });
 
-export const updateTourPricingSchema = z
-  .object({
-    pricingType: pricingTypeEnum.optional(),
-    minGroupSize: z.number().int().min(1).optional(),
-    maxGroupSize: z.number().int().min(1).optional(),
-    price: z.number().int().min(0).optional(),
-    isGroupPrice: z.boolean().optional(),
-  })
-  .refine(
-    (d) => {
-      if (d.minGroupSize !== undefined && d.maxGroupSize !== undefined) {
-        return d.minGroupSize <= d.maxGroupSize;
-      }
-      return true;
-    },
-    {
-      message: 'minGroupSize must be <= maxGroupSize',
-      path: ['minGroupSize'],
-    },
-  );
+// export const updateTourPricingSchema = z
+//   .object({
+//     pricingType: pricingTypeEnum.optional(),
+//     minGroupSize: z.number().int().min(1).optional(),
+//     maxGroupSize: z.number().int().min(1).optional(),
+//     price: z.number().int().min(0).optional(),
+//     isGroupPrice: z.boolean().optional(),
+//   })
+//   .refine(
+//     (d) => {
+//       if (d.minGroupSize !== undefined && d.maxGroupSize !== undefined) {
+//         return d.minGroupSize <= d.maxGroupSize;
+//       }
+//       return true;
+//     },
+//     {
+//       message: 'minGroupSize must be <= maxGroupSize',
+//       path: ['minGroupSize'],
+//     },
+//   );
+
+export const updateTourPricingSchema = createTourPricingSchema.partial();
+
+export type CreatePricingType = z.infer<typeof createTourPricingSchema>;
+export type UpdatePricingType = z.infer<typeof updateTourPricingSchema>;

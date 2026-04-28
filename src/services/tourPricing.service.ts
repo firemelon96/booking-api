@@ -1,4 +1,5 @@
 import { prisma } from '../config/prisma';
+import { PricingModel } from '../generated/prisma/enums';
 import { PricingType } from '../types/pricing-type';
 
 function rangesOverlap(aMin: number, aMax: number, bmin: number, bMax: number) {
@@ -54,7 +55,7 @@ export async function createTourPricing(params: {
   minGroupSize: number;
   maxGroupSize: number;
   price: number;
-  pricingModel: 'PER_PERSON' | 'PER_GROUP';
+  pricingModel: PricingModel;
 }) {
   const tour = await prisma.tour.findUnique({
     where: { id: params.tourId },
@@ -97,7 +98,7 @@ export async function updateTourPricing(params: {
   minGroupSize?: number;
   maxGroupSize?: number;
   price?: number;
-  isGroupPrice?: boolean;
+  pricingModel?: PricingModel;
 }) {
   const existing = await prisma.tourPricing.findUnique({
     where: { id: params.pricingId },
@@ -110,6 +111,7 @@ export async function updateTourPricing(params: {
   const nextPricingType = params.pricingType ?? existing.pricingType;
   const nextMin = params.minGroupSize ?? existing.minGroupSize;
   const nextMax = params.maxGroupSize ?? existing.maxGroupSize;
+  const nextPricingModel = params.pricingModel ?? existing.pricingModel;
 
   if (nextMin > nextMax)
     throw new Error(
@@ -131,7 +133,7 @@ export async function updateTourPricing(params: {
       minGroupSize: nextMin,
       maxGroupSize: nextMax,
       price: params.price,
-      isGroupPrice: params.isGroupPrice,
+      pricingModel: nextPricingModel,
     },
   });
 }

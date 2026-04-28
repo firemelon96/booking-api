@@ -52,13 +52,13 @@ export async function getById(req: Request, res: Response) {
 
 export async function createFullTour(req: Request, res: Response) {
   try {
-    const validFields = createFullTourSchema.safeParse(req.body);
+    const payloads = createFullTourSchema.safeParse(req.body);
 
-    if (!validFields.success) {
+    if (!payloads.success) {
       throw new Error('Invalid fields');
     }
 
-    const tourCreate = await createFullTourService(validFields.data);
+    const tourCreate = await createFullTourService(payloads.data);
 
     res.status(201).json(tourCreate);
   } catch (error: any) {
@@ -92,7 +92,7 @@ export async function update(req: Request, res: Response) {
 
     const data = updateTourSchema.parse(req.body);
 
-    const tour = await updateTour(id, data);
+    const tour = await updateTour({ ...data, tourId: id });
 
     res.json(tour);
   } catch (err: any) {
