@@ -49,3 +49,16 @@ export async function getTourById(id: string) {
 
   return tour;
 }
+
+export async function getTourIdBySlug(slug: string) {
+  const tour = await prisma.tour.findUnique({
+    where: { slug },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!tour) throw new Error('Tour not found');
+
+  return tour.id;
+}
