@@ -58,22 +58,6 @@ export function isActiveBooking(
   return false;
 }
 
-export async function getTourOrThrow(tourId: string) {
-  const tour = await prisma.tour.findUnique({
-    where: { id: tourId },
-    select: {
-      id: true,
-      joinerCapacity: true,
-      pricing: true,
-      capacityMode: true,
-      schedules: true,
-    },
-  });
-
-  if (!tour) throw new Error('Tour not found');
-  return tour;
-}
-
 export function sanitizeBooking(booking: any) {
   return {
     id: booking.id,

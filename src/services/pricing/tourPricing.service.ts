@@ -1,6 +1,6 @@
-import { prisma } from '../config/prisma';
-import { PricingModel } from '../generated/prisma/enums';
-import { PricingType } from '../types/pricing-type';
+import { prisma } from '../../config/prisma';
+import { PricingModel } from '../../generated/prisma/enums';
+import { PricingType } from '../../types/pricing-type';
 
 function rangesOverlap(aMin: number, aMax: number, bmin: number, bMax: number) {
   return Math.max(aMin, bmin) <= Math.min(aMax, bMax);

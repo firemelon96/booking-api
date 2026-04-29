@@ -37,7 +37,7 @@ export const createTourPricingSchema = z
 //     },
 //   );
 
-export const updateTourPricingSchema = createTourPricingSchema.partial();
+export const updateTourPricingSchema = createTourPricingSchema;
 
 export type CreatePricingType = z.infer<typeof createTourPricingSchema>;
 export type UpdatePricingType = z.infer<typeof updateTourPricingSchema>;

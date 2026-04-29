@@ -1,11 +1,6 @@
 import { schedule, validate } from 'node-cron';
 import { prisma } from '../config/prisma';
-import {
-  getTourOrThrow,
-  isExpired,
-  normalizeInterval,
-  sanitizeBooking,
-} from '../utils/helper';
+import { isExpired, normalizeInterval, sanitizeBooking } from '../utils/helper';
 import { calculate } from './pricing.service';
 import { get } from 'lodash';
 import { BOOKING_RULES } from '../constant/constant';
@@ -20,6 +15,8 @@ import { decrement, ensureRows, getRows } from './capacity.service';
 import { reserve } from './availability.service';
 import { Prisma } from '../generated/prisma/client';
 import { GetAllBookingParams } from '../validators/admin.schema';
+// import { getTourOrThrow } from './tours/tour.query';
+import { findTourOrFail } from '../modules/tours/tour.query';
 
 export async function listAllBookings({
   endDate,
@@ -239,7 +236,7 @@ export async function createNewBooking({
 }: z.infer<typeof createBookingSchema> & { userId: string }) {
   const interval = normalizeInterval(startDate, endDate);
 
-  const tour = await getTourOrThrow(tourId);
+  const tour = await findTourOrFail(tourId);
 
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000); //15 minutes
 
@@ -347,7 +344,7 @@ export async function rescheduleBooking({
     where: { id: bookingId },
   });
 
-  const tour = await getTourOrThrow(booking.tourId);
+  const tour = await findTourOrFail(booking.tourId);
 
   const oldInterval = {
     start: booking.startDate,
@@ -487,7 +484,7 @@ export async function cancelBooking({
       where: { id: bookingId },
     });
 
-    const tour = await getTourOrThrow(booking.tourId);
+    const tour = await findTourOrFail(booking.tourId);
 
     const scheduleKey = booking.scheduleId ?? 'NO_SCHEDULE';
     //protection
@@ -573,7 +570,7 @@ export async function expireBooking({
 
   if (!isExpired(booking.status, booking.expiresAt)) return booking;
 
-  const tour = await getTourOrThrow(booking.tourId);
+  const tour = await findTourOrFail(booking.tourId);
 
   const oldSnapshot = sanitizeBooking(booking);
 

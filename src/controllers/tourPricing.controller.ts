@@ -8,7 +8,7 @@ import {
   createTourPricing,
   updateTourPricing,
   deleteTourPricing,
-} from '../services/tourPricing.service';
+} from '../services/pricing/tourPricing.service';
 
 export async function list(req: Request, res: Response) {
   try {

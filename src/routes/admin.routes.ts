@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { authenticate } from '../middlewares/auth.middleware';
 import { requireAdmin } from '../middlewares/role.middleware';
 import {
-  adminGetAllTours,
   blockDatesController,
   bulkCapacityController,
   getAdminBookingsController,
@@ -22,7 +21,7 @@ import itineraryRoutes from './itinerary.routes';
 const router = Router();
 
 //tours
-router.get('/tours', authenticate, requireAdmin, adminGetAllTours);
+// router.get('/tours', authenticate, requireAdmin, adminGetAllTours);
 router.post('/tours', authenticate, requireAdmin, createFullTour);
 router.get('/tours/:id', authenticate, requireAdmin, getById);
 router.patch('/tours/:id', authenticate, requireAdmin, update);

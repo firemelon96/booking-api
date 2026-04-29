@@ -9,7 +9,7 @@ import {
   getAllBookingsParamsSchema,
   getAllTourParamsSchema,
 } from '../validators/admin.schema';
-import { adminListAllTours } from '../services/tour.service';
+// import { adminListAllTours } from '../services/tours/tour.service';
 
 export async function setCapacityController(req: Request, res: Response) {
   const { tourId, date, scheduleId, capacity } = req.body;
@@ -64,27 +64,4 @@ export async function getAdminBookingsController(req: Request, res: Response) {
     endDate: fields.data?.endDate ? new Date(fields.data.endDate) : undefined,
   });
   res.json(bookings);
-}
-
-export async function adminGetAllTours(req: Request, res: Response) {
-  const validateFields = getAllTourParamsSchema.safeParse(req.query);
-
-  if (!validateFields.success) {
-    return res.status(403).json({ error: 'Invalid fields' });
-  }
-
-  const { capacityMode, duration, limit, page, search, sort, type } =
-    validateFields.data;
-
-  const tours = await adminListAllTours({
-    capacityMode,
-    duration,
-    limit,
-    page,
-    search,
-    sort,
-    type,
-  });
-
-  res.json(tours);
 }

@@ -5,7 +5,7 @@ import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger';
 
 import authRoutes from './routes/auth.routes';
-import tourRoutes from './routes/tour.routes';
+import tourRoutes from './modules/tours/tour.routes';
 import pricingRoutes from './routes/pricing.routes';
 import userRoutes from './routes/user.routes';
 import bookingRoutes from './routes/booking.routes';
@@ -17,6 +17,7 @@ import webhookRoutes from './routes/webhook.routes';
 import path from 'path';
 import passport from './config/passport';
 import cookieParser from 'cookie-parser';
+import { errorHandler } from './middlewares/error.middleware';
 
 const app = express();
 
@@ -41,7 +42,7 @@ app.use('/api/tours', tourRoutes);
 app.use('/api/me', userRoutes);
 
 //admin routes
-app.use('/api/admin', adminRoutes);
+// app.use('/api/admin', adminRoutes);
 
 app.use('/api/pricing', pricingRoutes);
 
@@ -55,5 +56,7 @@ app.use('/api/availability', availabilityRoutes);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+app.use(errorHandler);
 
 export default app;

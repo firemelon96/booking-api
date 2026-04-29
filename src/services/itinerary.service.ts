@@ -1,5 +1,4 @@
 import { prisma } from '../config/prisma';
-import { getTourOrThrow } from '../utils/helper';
 import { UpdateItineraryInput } from '../validators/itinerary.schema';
 
 // export async function addItinerary(params: {

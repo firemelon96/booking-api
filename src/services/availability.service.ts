@@ -3,7 +3,6 @@ import { parseISO, eachDayOfInterval, startOfDay } from 'date-fns';
 import {
   getMonthRange,
   getScheduleKey,
-  getTourOrThrow,
   isActiveBooking,
   normalizeInterval,
   overlaps,
@@ -13,6 +12,8 @@ import { Prisma, Tour } from '../generated/prisma/client';
 import { getRows, increment, lock } from './capacity.service';
 import z from 'zod';
 import { availabilityParam } from '../validators/availability.schema';
+// import {  } from './tours/tour.query';
+import { findTourOrFail } from '../modules/tours/tour.query';
 
 function dayKey(d: Date) {
   return d.toISOString().slice(0, 10);
@@ -24,7 +25,7 @@ export async function getCalendarAvailability({
   scheduleId,
 }: z.infer<typeof availabilityParam>) {
   // console.log(month);
-  const tour = await getTourOrThrow(tourId);
+  const tour = await findTourOrFail(tourId);
 
   const scheduleKey = getScheduleKey(scheduleId);
   const { start, end } = getMonthRange(month);
