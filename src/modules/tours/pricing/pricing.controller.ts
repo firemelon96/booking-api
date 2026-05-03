@@ -1,8 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
-import {
-  createPricingArraySchema,
-  createTourPricingSchema,
-} from './pricing.validator';
+import { createPricingArraySchema } from './pricing.validator';
 import { modifyPricing } from './pricing.service';
 
 export async function replacePricing(

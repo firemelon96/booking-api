@@ -39,7 +39,7 @@ export async function closeDates({
   return { success: true, blockedDates: dates.length };
 }
 
-export async function unblockDates({
+export async function openDates({
   tourId,
   startDate,
   endDate,

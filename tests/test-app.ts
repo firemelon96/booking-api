@@ -1,6 +1,7 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
-import authRoutes from '../src/routes/auth.routes';
+import authRoutes from '../src/modules/auth/auth.routes';
+import tourRoutes from '../src/modules/tours/tour.routes';
 
 export const createTestApp = () => {
   const app = express();
@@ -9,6 +10,7 @@ export const createTestApp = () => {
   app.use(cookieParser());
 
   app.use('/auth', authRoutes);
+  app.use('/tour', tourRoutes);
 
   return app;
 };

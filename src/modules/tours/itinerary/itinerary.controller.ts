@@ -16,6 +16,8 @@ export async function replaceItinerary(req: Request, res: Response) {
 
   try {
     const replaced = await modifyItinerary(tourId, payload.data);
+
+    res.json(replaced);
   } catch (error: any) {
     res.status(400).json({ error: error.message });
   }

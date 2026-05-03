@@ -3,14 +3,11 @@ import express from 'express';
 
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger';
-
-import authRoutes from './routes/auth.routes';
 import tourRoutes from './modules/tours/tour.routes';
 import pricingRoutes from './routes/pricing.routes';
 import userRoutes from './routes/user.routes';
-import bookingRoutes from './routes/booking.routes';
-import uploadRoutes from './routes/upload.routes';
-import adminRoutes from './routes/admin.routes';
+import authRoutes from './modules/auth/auth.routes';
+import bookingRoutes from './modules/bookings/booking.route';
 import availabilityRoutes from './routes/availability.routes';
 import paymentRoutes from './routes/payment.routes';
 import webhookRoutes from './routes/webhook.routes';
@@ -38,6 +35,7 @@ app.use('/api/auth', authRoutes);
 //public routes
 app.use('/api/tours', tourRoutes);
 
+app.use('/api/bookings', bookingRoutes);
 //authorized routes
 app.use('/api/me', userRoutes);
 
@@ -45,8 +43,6 @@ app.use('/api/me', userRoutes);
 // app.use('/api/admin', adminRoutes);
 
 app.use('/api/pricing', pricingRoutes);
-
-app.use('/api/bookings', bookingRoutes);
 
 // app.use('/api/upload', uploadRoutes);
 app.use('/api/payments', paymentRoutes);

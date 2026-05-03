@@ -82,6 +82,27 @@ model EmailVerificationToken {
   user  User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+enum AdminAction {
+  OVERBOOKING
+  FORCED_PRIVATE
+}
+
+model AdminWarningLog{
+  id  String  @id @default(uuid())
+
+  actionType  AdminAction
+  message   String
+
+  tourId    String
+  bookingId String?
+
+  actorId String
+
+  metadata  Json
+
+  createdAt DateTime @default(now())
+}
+
 //================================
 // TOUR TABLES
 //================================
@@ -292,6 +313,9 @@ model Booking {
 
   totalPrice Float
   status     BookingStatus @default(PENDING)
+
+  isOverbooked Boolean @default(false)
+  isAdminOverride Boolean @default(false)
 
   startDate DateTime
   endDate   DateTime?

@@ -9,7 +9,7 @@ export async function calendarAvailability({
   month,
   scheduleId,
 }: CalendarQueryType & { slug: string }) {
-  const tourId = await getTourIdBySlug(slug);
+  const tour = await getTourIdBySlug(slug);
 
   const scheduleKey = getScheduleKey(scheduleId);
   const { start, end } = getMonthRange(month);
@@ -20,7 +20,7 @@ export async function calendarAvailability({
     //capacity source of truth
     const capacities = await tx.tourDailyCapacity.findMany({
       where: {
-        tourId,
+        tourId: tour.id,
         scheduleKey,
         date: { gte: start, lte: end },
       },
@@ -34,7 +34,7 @@ export async function calendarAvailability({
     //admin overrides
     const availability = await tx.tourAvailability.findMany({
       where: {
-        tourId,
+        tourId: tour.id,
         date: { gte: start, lte: end },
       },
       select: {
@@ -59,27 +59,48 @@ export async function calendarAvailability({
       const capacityRow = capacityMap.get(key);
       const availabilityRow = availabilityMap.get(key);
 
-      let status: 'available' | 'full' | 'unavailable' = 'available';
+      let status: 'AVAILABLE' | 'FULL' | 'CLOSED' | 'NO_CAPACITY';
+      let capacity = 0;
+      let booked = 0;
+      let remainingSlots: number | null = null;
 
       if (availabilityRow?.isClosed) {
-        status = 'unavailable';
-      } else if (capacityRow) {
-        status =
-          capacityRow.capacity - capacityRow.booked > 0 ? 'available' : 'full';
+        status = 'CLOSED';
+        return {
+          date: day.toISOString().slice(0, 10),
+          status,
+          available: false,
+          remainingSlots: null,
+          capacity: 0,
+          booked: 0,
+        };
+      }
+
+      if (capacityRow) {
+        capacity = capacityRow.capacity;
+        booked = capacityRow.booked;
       } else {
-        //no capacity row means not available for booking
-        status = 'unavailable';
+        capacity = tour.joinerCapacity ?? 0;
+        booked = 0;
+      }
+
+      if (capacity === 0) {
+        status = 'NO_CAPACITY';
+      } else if (booked >= capacity) {
+        status = 'FULL';
+        remainingSlots = 0;
+      } else {
+        status = 'AVAILABLE';
+        remainingSlots = capacity - booked;
       }
 
       return {
         date: day.toISOString().slice(0, 10),
         status,
-        available: status === 'available',
-        availableSpots: capacityRow
-          ? Math.max(capacityRow.capacity - capacityRow.booked, 0)
-          : 0,
-        capacity: capacityRow ? capacityRow.capacity : 0,
-        booked: capacityRow ? capacityRow.booked : 0,
+        available: status === 'AVAILABLE',
+        remainingSlots: remainingSlots,
+        capacity,
+        booked,
       };
     });
 

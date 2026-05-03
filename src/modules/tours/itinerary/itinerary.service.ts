@@ -1,5 +1,7 @@
 import { prisma } from '../../../config/prisma';
 import { Prisma } from '../../../generated/prisma/client';
+import { findTourOrFail } from '../tour.query';
+import { validateItineraryRules } from './itinerary.rule';
 import { ItineraryType } from './itinerary.type';
 
 export async function createItinerary(
@@ -30,6 +32,10 @@ export async function modifyItinerary(
   tourId: string,
   itinerary: ItineraryType,
 ) {
+  const tour = await findTourOrFail(tourId);
+
+  validateItineraryRules(tour.type, itinerary, tour.durationDays!);
+
   return prisma.$transaction(async (tx) => {
     await tx.itinerary.deleteMany({ where: { tourId } });
 

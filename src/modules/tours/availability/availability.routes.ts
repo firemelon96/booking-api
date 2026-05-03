@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../../../middlewares/auth.middleware';
 import { requireAdmin } from '../../../middlewares/role.middleware';
 import { blockDates } from './availability.controller';
-import { unblockDates } from './availability.service';
+import { unblockDates } from './availability.controller';
 
 const router = Router({ mergeParams: true });
 

@@ -55,10 +55,11 @@ export async function getTourIdBySlug(slug: string) {
     where: { slug },
     select: {
       id: true,
+      joinerCapacity: true,
     },
   });
 
   if (!tour) throw new Error('Tour not found');
 
-  return tour.id;
+  return tour;
 }

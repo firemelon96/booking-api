@@ -20,7 +20,7 @@ export async function getAllTours(
   const payload = tourParamsSchema.safeParse(req.query);
 
   if (!payload.success) {
-    return res.status(403).json({ error: 'Invalid fields' });
+    throw new Error('Invalid fields');
   }
 
   try {

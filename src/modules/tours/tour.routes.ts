@@ -14,6 +14,7 @@ import imageRoutes from '../tours/images/image.routes';
 import capacityRoutes from './capacity/capacity.routes';
 import availabilityRoutes from './availability/availability.routes';
 import calendarRoutes from './calendar/calendar.route';
+import { userCreateBooking } from '../bookings/booking.controller';
 
 const router = Router();
 
@@ -24,6 +25,8 @@ router.get('/:slug', getTourDetail);
 router.post('/', authenticate, requireAdmin, addTour);
 router.patch('/:id', authenticate, requireAdmin, editBaseTour);
 router.delete('/:id', authenticate, requireAdmin, removeTour);
+
+router.post('/:tourId/booking', authenticate, userCreateBooking);
 
 router.use('/:tourId/itinerary', itineraryRoutes);
 router.use('/:tourId/pricing', pricingRoutes);

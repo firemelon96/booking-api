@@ -3,12 +3,14 @@ import { prisma } from '../../config/prisma';
 
 import { slugify } from '../../utils/slugify';
 import { GetAllTourParamsType } from '../../validators/admin.schema';
-import { validateBaseTourRules, validateTourRules } from './tour.rules';
+import { validateBaseTourRules } from './tour.rules';
 import { existingTourSlug, findTourOrFail } from './tour.query';
 import { createPricing } from './pricing/pricing.service';
 import { createItinerary } from './itinerary/itinerary.service';
-import { TourType, UpdateTourType } from './tour.type';
+import { CreateTourType, UpdateTourType } from './tour.type';
 import { attachImages } from './images/images.service';
+import { validateItineraryRules } from './itinerary/itinerary.rule';
+import { validatePricingRules } from './pricing/pricing.rule';
 
 export async function listTours({
   page = 1,
@@ -109,8 +111,9 @@ export async function getTourBySlug(slug: string) {
   return tour;
 }
 
-export async function createFullTour(data: TourType) {
-  validateTourRules(data);
+export async function createFullTour(data: CreateTourType) {
+  validateItineraryRules(data.type, data.itinerary, data.durationDays!);
+  validatePricingRules(data.capacityMode, data.pricing);
 
   const slug = slugify(data.name);
 

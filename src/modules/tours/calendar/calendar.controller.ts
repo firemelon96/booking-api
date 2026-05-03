@@ -20,7 +20,7 @@ export async function getCalendarAvailability(
   }
 
   try {
-    const results = calendarAvailability({
+    const results = await calendarAvailability({
       slug,
       ...payload.data,
     });

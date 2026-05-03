@@ -99,7 +99,11 @@ export async function updateCapacity({
 }
 
 export async function deleteCapacity({ id }: { id: string }) {
-  await findCapacityOrFail({ id });
+  const cap = await findCapacityOrFail({ id });
+
+  if (cap.booked > 0) {
+    throw new Error('Cannot reset active booking');
+  }
 
   return prisma.tourDailyCapacity.delete({
     where: {

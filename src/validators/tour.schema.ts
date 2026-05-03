@@ -1,7 +1,7 @@
 import z from 'zod';
 import { imageSchema } from './image.schema';
-import { createItinerarySchema, days } from './itinerary.schema';
-import { createTourPricingSchema } from './tourPricing.schema';
+// import { createItinerarySchema, days } from './itinerary.schema';
+// import { createTourPricingSchema } from './tourPricing.schema';
 import { CapacityMode, TourType } from '../generated/prisma/enums';
 
 export const createTourSchema = z.object({
@@ -24,9 +24,9 @@ export const updateTourSchema = z
     exclusions: z.string().array(),
     durationDays: z.number().optional(),
     capacityMode: z.enum(CapacityMode),
-    type: z.enum(TourType),
-    itinerary: days.array(),
-    pricing: createTourPricingSchema.array(),
+    // type: z.enum(TourType),
+    // itinerary: days.array(),
+    // pricing: createTourPricingSchema.array(),
   })
   .partial();
 
@@ -40,8 +40,8 @@ export const createFullTourSchema = z.object({
   inclusions: z.string().array(),
   exclusions: z.string().array(),
   imageIds: z.string().array(),
-  itinerary: days.array(),
-  pricing: createTourPricingSchema.array(),
+  // itinerary: days.array(),
+  // pricing: createTourPricingSchema.array(),
 });
 
 export type CreateTourType = z.infer<typeof createFullTourSchema>;

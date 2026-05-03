@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import { blockDatesSchema } from './availability.validator';
-import { closeDates, unblockDates } from './availability.service';
+import { closeDates, openDates } from './availability.service';
 
 export async function blockDates(
   req: Request,
@@ -31,7 +31,7 @@ export async function blockDates(
   }
 }
 
-export async function openDates(
+export async function unblockDates(
   req: Request,
   res: Response,
   next: NextFunction,
@@ -49,7 +49,7 @@ export async function openDates(
   }
 
   try {
-    const result = await unblockDates({
+    const result = await openDates({
       ...payload.data,
       tourId,
     });
