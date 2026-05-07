@@ -1,5 +1,5 @@
-import { prisma } from '../src/config/prisma';
-import { PricingModel, PricingType } from '../src/generated/prisma/enums';
+import { prisma } from '../config/prisma';
+import { PricingModel, PricingType } from '../generated/prisma/enums';
 
 export async function seedShared() {
   return prisma.$transaction(async (tx) => {
@@ -20,6 +20,12 @@ export async function seedShared() {
         exclusions: ['Personal expenses', 'Gratuities'],
         location: 'Puerto Princesa, Palawan',
         type: 'DAY',
+        joinerCapacity: 2,
+      },
+      include: {
+        schedules: true,
+        pricing: true,
+        itinerary: true,
       },
     });
 

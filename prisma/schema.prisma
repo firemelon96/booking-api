@@ -85,6 +85,8 @@ model EmailVerificationToken {
 enum AdminAction {
   OVERBOOKING
   FORCED_PRIVATE
+  BOOKED_ON_CLOSED_DATE
+  FORCED_JOINER
 }
 
 model AdminWarningLog{
@@ -118,7 +120,7 @@ model Tour {
   exclusions   String[]
   location     String
   durationDays Int? //For day tours, this will be 1 day. For package tours, this will be the total duration of the tour in days.
-  capacityMode CapacityMode @default(EXCLUSIVE)
+  capacityMode CapacityMode @default(MIXED)
   type         TourType     @default(DAY)
   timezone     String       @default("Asia/Manila")
 
@@ -311,7 +313,7 @@ model Booking {
   participants Int
   notes        String?
 
-  totalPrice Float
+  totalPrice Float?
   status     BookingStatus @default(PENDING)
 
   isOverbooked Boolean @default(false)

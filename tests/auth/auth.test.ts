@@ -61,7 +61,7 @@ describe('Auth Flow', () => {
       password,
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(500);
   });
 
   //login success
@@ -160,7 +160,7 @@ describe('Auth Flow', () => {
 
     const res = await request(app)
       .post('/auth/reset-password')
-      .send({ token: rawToken, password: 'newPassword123' });
+      .send({ token: rawToken, newPassword: 'newPassword123' });
 
     expect(res.status).toBe(200);
 

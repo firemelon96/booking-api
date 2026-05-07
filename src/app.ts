@@ -1,17 +1,16 @@
+import path from 'path';
 import cors from 'cors';
 import express from 'express';
 
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger';
-import tourRoutes from './modules/tours/tour.routes';
-import pricingRoutes from './routes/pricing.routes';
-import userRoutes from './routes/user.routes';
+
 import authRoutes from './modules/auth/auth.routes';
+import tourRoutes from './modules/tours/tour.routes';
 import bookingRoutes from './modules/bookings/booking.route';
-import availabilityRoutes from './routes/availability.routes';
-import paymentRoutes from './routes/payment.routes';
-import webhookRoutes from './routes/webhook.routes';
-import path from 'path';
+import webhookRoutes from './modules/webhooks/xendit/xendit.route';
+import userRoutes from './modules/users/user.route';
+// import paymentRoutes from './routes/payment.routes';
 import passport from './config/passport';
 import cookieParser from 'cookie-parser';
 import { errorHandler } from './middlewares/error.middleware';
@@ -37,18 +36,15 @@ app.use('/api/tours', tourRoutes);
 
 app.use('/api/bookings', bookingRoutes);
 //authorized routes
-app.use('/api/me', userRoutes);
+app.use('/api/users', userRoutes);
+
+app.use('/api/webhook', webhookRoutes);
 
 //admin routes
 // app.use('/api/admin', adminRoutes);
 
-app.use('/api/pricing', pricingRoutes);
-
 // app.use('/api/upload', uploadRoutes);
-app.use('/api/payments', paymentRoutes);
-
-app.use('/api/webhook', webhookRoutes);
-app.use('/api/availability', availabilityRoutes);
+// app.use('/api/payments', paymentRoutes);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));

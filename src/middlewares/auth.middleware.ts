@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { verifyAccessToken } from '../services/token.service';
+import { verifyAccessToken } from '../modules/auth/token/token.service';
 import { Role } from '../generated/prisma/enums';
 
 interface JwtPayLoad {

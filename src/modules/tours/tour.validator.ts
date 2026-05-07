@@ -15,6 +15,7 @@ export const createFullTourSchema = z.object({
   imageIds: z.string().array(),
   itinerary: daysSchema,
   pricing: createTourPricingSchema.array(),
+  joinerCapacity: z.number().optional(),
 });
 
 export const updatePartialTourSchema = z

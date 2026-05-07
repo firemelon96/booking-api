@@ -31,7 +31,7 @@ export async function checkAvailability({
   for (const entry of closedDates) {
     await logAdminWarning({
       tx,
-      actionType: 'FORCED_PRIVATE',
+      actionType: 'BOOKED_ON_CLOSED_DATE',
       message: `Admin booked on closed date ${entry.date.toISOString()}`,
       tourId,
       actorId: userId,

@@ -155,7 +155,7 @@ export async function createBooking({
   const tour = await findTourOrFail(tourId);
 
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes from now
-  const scheduleKey = scheduleId ?? 'NO_SCHEDULE';
+  // const scheduleKey = scheduleId ?? 'NO_SCHEDULE';
 
   validateBookingRules({
     scheduleId: scheduleId ?? null,
@@ -174,7 +174,7 @@ export async function createBooking({
       tx,
       tourId,
       scheduleId: scheduleId ?? null,
-      joinerCapacity: tour.joinerCapacity ?? 0,
+      joinerCapacity: tour.joinerCapacity,
       dates,
     });
 
@@ -208,7 +208,7 @@ export async function createBooking({
         notes,
         isOverbooked: hasOverbooking,
         isAdminOverride: role === 'ADMIN',
-        scheduleId: scheduleKey,
+        scheduleId: scheduleId || null,
         expiresAt,
         status: 'PENDING',
       },
@@ -393,4 +393,51 @@ export async function detailedBooking({
     scheduleId: booking?.scheduleId,
     pricingType: booking?.pricingType,
   };
+}
+
+export async function expiredBooking(bookingId: string) {
+  const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
+
+  if (!booking) {
+    throw new Error('Booking not found');
+  }
+
+  if (booking.status !== 'PENDING') {
+    return booking;
+  }
+
+  if (booking.expiresAt && booking.expiresAt < new Date()) {
+    return booking;
+  }
+
+  const interval = normalizeInterval(booking.startDate, booking.endDate);
+
+  const dates = eachDayOfInterval(interval);
+
+  return prisma.$transaction(async (tx) => {
+    await releaseCapacity({
+      tx,
+      dates,
+      participants: booking.participants,
+      tourId: booking.tourId,
+      scheduleId: booking.scheduleId,
+    });
+
+    const updated = await tx.booking.update({
+      where: { id: bookingId },
+      data: {
+        status: 'CANCELLED',
+      },
+    });
+
+    await logBookingAction({
+      tx,
+      userId: booking.userId,
+      role: 'ADMIN',
+      newValue: updated,
+      action: 'CANCELLED',
+    });
+
+    return updated;
+  });
 }

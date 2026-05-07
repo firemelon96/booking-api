@@ -10,7 +10,8 @@ export const createTestApp = () => {
   app.use(cookieParser());
 
   app.use('/auth', authRoutes);
-  app.use('/tour', tourRoutes);
+  app.use('/tours', tourRoutes);
+  // app.use('/bookings', bookingRoutes);
 
   return app;
 };

@@ -5,6 +5,6 @@ import { replacePricing } from './pricing.controller';
 
 const router = Router();
 
-router.put('/pricing', authenticate, requireAdmin, replacePricing);
+router.put('/', authenticate, requireAdmin, replacePricing);
 
 export default router;

@@ -132,6 +132,7 @@ export async function createFullTour(data: CreateTourType) {
         inclusions: data.inclusions,
         capacityMode: data.capacityMode,
         type: data.type,
+        joinerCapacity: data.joinerCapacity,
       },
     });
 

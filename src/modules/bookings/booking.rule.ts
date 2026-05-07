@@ -3,11 +3,7 @@ import {
   eachDayOfInterval,
   isSameDay,
 } from 'date-fns';
-import {
-  Booking,
-  TourSchedule,
-  TourScheduleOption,
-} from '../../generated/prisma/client';
+import { Booking } from '../../generated/prisma/client';
 import { normalizeInterval } from '../../utils/helper';
 
 export const BOOKING_RULES = {

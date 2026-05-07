@@ -214,13 +214,14 @@ export async function forgotPassword(
   }
 
   try {
-    await AuthService.forgotPassword(payload.data);
+    const token = await AuthService.forgotPassword(payload.data);
 
-    return res.json({ success: true, message: 'Reset password email sent.' });
+    return res.json({ success: true, message: token });
   } catch (error) {
     next(error);
   }
 }
+
 export async function resetPassword(
   req: Request,
   res: Response,
@@ -234,6 +235,8 @@ export async function resetPassword(
 
   try {
     await AuthService.resetPassword(payload.data);
+
+    res.json({ success: true });
   } catch (error) {
     next(error);
   }
