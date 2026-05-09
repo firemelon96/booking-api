@@ -22,7 +22,7 @@ export async function createPaymentIntent({
   const invoice = await xendit.Invoice.createInvoice({
     data: {
       externalId: booking.id,
-      amount: booking.totalPrice,
+      amount: booking.totalPrice ?? 0,
       description: `Payment for booking ${booking.id} - ${booking.tour.name}`,
       invoiceDuration: 3600, // 1 hour,
       currency: 'PHP',

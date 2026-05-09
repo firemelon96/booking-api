@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken } from '../modules/auth/token/token.service';
 import { Role } from '../generated/prisma/enums';
 
-interface JwtPayLoad {
+export interface JwtPayLoad {
   userId: string;
   role: Role;
 }

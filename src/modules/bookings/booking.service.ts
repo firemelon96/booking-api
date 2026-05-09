@@ -178,7 +178,7 @@ export async function createBooking({
       dates,
     });
 
-    const { hasOverbooking } = await reserveCapacity({
+    const { hasOverbooking, hasConflict } = await reserveCapacity({
       tx,
       capacityMode: tour.capacityMode,
       dates,
@@ -222,7 +222,7 @@ export async function createBooking({
       action: 'CREATED',
     });
 
-    return booking;
+    return { booking, hasConflict };
   });
 }
 
@@ -377,6 +377,10 @@ export async function detailedBooking({
       },
       include: { tour: true, user: true },
     });
+  }
+
+  if (!booking) {
+    throw new Error('No booking found');
   }
 
   return {

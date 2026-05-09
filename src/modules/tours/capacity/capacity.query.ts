@@ -90,33 +90,40 @@ export async function reserveCapacity({
 }) {
   const isAdmin = role === 'ADMIN';
 
-  switch (capacityMode) {
-    case 'EXCLUSIVE':
-      return reserveExclusive({ tx, dates, ctx, isAdmin });
-    case 'SHARED':
-      return reserveShared({
-        tx,
-        dates,
-        ctx,
-        participants,
-        isAdmin,
-        userId,
-      });
-    case 'MIXED':
-      return pricingType === 'PRIVATE'
-        ? reservePrivate({ tx, dates, ctx, isAdmin, userId })
-        : reserveShared({
-            tx,
-            dates,
-            ctx,
-            participants,
-            isAdmin,
-            userId,
-          });
+  const { hasConflict } = await assertBookingConflicts({
+    tx,
+    dates,
+    ctx,
+    capacityMode,
+    pricingType,
+    isAdmin,
+    userId,
+  });
 
-    default:
-      throw new Error('Invalid capacity mode');
+  const needsSharedCapacity =
+    capacityMode === 'SHARED' ||
+    (capacityMode === 'MIXED' && pricingType === 'JOINER');
+
+  if (!needsSharedCapacity) {
+    return {
+      hasOverbooking: false,
+      hasConflict,
+    };
   }
+
+  const { hasOverbooking } = await reserveShared({
+    tx,
+    dates,
+    ctx,
+    participants,
+    isAdmin,
+    userId,
+  });
+
+  return {
+    hasConflict,
+    hasOverbooking,
+  };
 }
 
 async function reserveExclusive({
@@ -354,4 +361,156 @@ export async function releaseCapacity({
       },
     });
   }
+}
+
+export async function lockCapacityRows(
+  tx: Prisma.TransactionClient,
+  {
+    tourId,
+    dates,
+    scheduleKey,
+  }: {
+    tourId: string;
+    dates: Date[];
+    scheduleKey: string;
+  },
+) {
+  const result = await tx.$queryRaw<
+    {
+      id: string;
+      capacity: number;
+      booked: number;
+    }[]
+  >`
+    SELECT id, capacity, booked
+    FROM "TourDailyCapacity"
+    WHERE "tourId" = ${tourId}
+      AND "scheduleKey" = ${scheduleKey}
+      AND "date" IN (${Prisma.join(dates)})
+    FOR UPDATE
+  `;
+
+  return result;
+}
+
+export async function assertBookingConflicts({
+  tx,
+  dates,
+  ctx,
+  capacityMode,
+  pricingType,
+  isAdmin,
+  userId,
+}: {
+  tx: Prisma.TransactionClient;
+  dates: Date[];
+  ctx: CapacityCtx;
+  capacityMode: CapacityMode;
+  pricingType: PricingType;
+  isAdmin: boolean;
+  userId: string;
+}) {
+  let hasConflict = false;
+
+  for (const date of dates) {
+    const row = ctx.map.get(startOfDay(date).getTime());
+
+    if (!row) {
+      throw new Error('Capacity row not found');
+    }
+
+    if (capacityMode === 'EXCLUSIVE') {
+      const hasBooking = row.booked > 0;
+
+      if (hasBooking) {
+        hasConflict = true;
+
+        if (!isAdmin) {
+          throw new Error('Date already has an existing booking');
+        }
+      }
+
+      await logAdminWarning({
+        tx,
+        actionType: 'FORCED_PRIVATE',
+        message: 'Admin forced booking on exclusive date',
+        tourId: row.tourId,
+        actorId: userId,
+        metadata: {
+          date,
+          existingBooked: row.booked,
+        },
+      });
+    }
+
+    if (capacityMode === 'MIXED' && pricingType === 'PRIVATE') {
+      if (row.booked > 0) {
+        hasConflict = true;
+
+        if (!isAdmin) {
+          throw new Error(
+            'Cannot create private booking with existing joiners',
+          );
+        }
+
+        await logAdminWarning({
+          tx,
+          actionType: 'FORCED_PRIVATE',
+          message: 'Admin forced private booking over joiners',
+          tourId: row.tourId,
+          actorId: userId,
+          metadata: {
+            date,
+            existingBooked: row.booked,
+          },
+        });
+      }
+    }
+
+    if (capacityMode === 'MIXED' && pricingType === 'JOINER') {
+      const hasPrivateBooking = await tx.booking.findFirst({
+        where: {
+          tourId: row.tourId,
+          scheduleId:
+            ctx.scheduleKey === 'NO_SCHEDULE' ? null : ctx.scheduleKey,
+          pricingType: 'PRIVATE',
+          status: {
+            in: ['PENDING', 'CONFIRMED'],
+          },
+          startDate: {
+            lte: date,
+          },
+          endDate: {
+            gte: date,
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (hasPrivateBooking) {
+        hasConflict = true;
+
+        if (!isAdmin) {
+          throw new Error('Cannot join because a private booking exist');
+        }
+
+        await logAdminWarning({
+          tx,
+          actionType: 'FORCED_PRIVATE',
+          message: 'Admin forced joiner booking over private booking',
+          tourId: row.tourId,
+          actorId: userId,
+          metadata: {
+            date,
+          },
+        });
+      }
+    }
+  }
+
+  return {
+    hasConflict,
+  };
 }

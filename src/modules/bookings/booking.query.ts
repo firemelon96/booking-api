@@ -22,18 +22,26 @@ export async function findBookingOrThrow({
   role: Role;
   userId: string;
 }) {
+  let booking;
+
   if (role === 'ADMIN') {
-    return prisma.booking.findUniqueOrThrow({
+    booking = await prisma.booking.findUnique({
       where: {
         id: bookingId,
       },
     });
   }
 
-  return prisma.booking.findFirstOrThrow({
+  booking = await prisma.booking.findFirst({
     where: {
       id: bookingId,
       userId,
     },
   });
+
+  if (!booking) {
+    throw new Error('Booking Not found');
+  }
+
+  return booking;
 }

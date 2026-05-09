@@ -11,7 +11,7 @@ import bookingRoutes from './modules/bookings/booking.route';
 import webhookRoutes from './modules/webhooks/xendit/xendit.route';
 import userRoutes from './modules/users/user.route';
 // import paymentRoutes from './routes/payment.routes';
-import passport from './config/passport';
+
 import cookieParser from 'cookie-parser';
 import { errorHandler } from './middlewares/error.middleware';
 
@@ -22,7 +22,6 @@ app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json());
 app.use(cookieParser());
-app.use(passport.initialize());
 
 app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
@@ -39,12 +38,6 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/users', userRoutes);
 
 app.use('/api/webhook', webhookRoutes);
-
-//admin routes
-// app.use('/api/admin', adminRoutes);
-
-// app.use('/api/upload', uploadRoutes);
-// app.use('/api/payments', paymentRoutes);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));

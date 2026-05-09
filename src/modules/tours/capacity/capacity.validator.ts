@@ -8,7 +8,8 @@ export const overrideCapacitySchema = z.object({
 
 export const bulkOverrideCapacitySchema = z.object({
   startDate: z.coerce.date(),
-  endDate: z.coerce.date(),
+  endDate: z.coerce.date().optional(),
   scheduleId: z.string().optional(),
   capacity: z.number().int().min(0),
+  tourId: z.string(),
 });

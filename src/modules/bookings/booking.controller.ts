@@ -148,6 +148,7 @@ export async function cancelBooking(
   const input = {
     bookingId: req.params.bookingId,
     userId: req.user.userId,
+    role: req.user.role,
   };
 
   const payload = cancelBookingSchema.safeParse(input);
