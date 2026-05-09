@@ -34,6 +34,8 @@ model User {
   bookings Booking[]
   reviews  Review[]
 
+  likedTours  TourLike[]
+
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 }
@@ -135,8 +137,24 @@ model Tour {
   
   bookings           Booking[]
 
+  likes             TourLike[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model TourLike {
+  id  String @id @default(uuid())
+
+  userId  String
+  tourId  String
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tour  Tour  @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, tourId])
 }
 
 //================================
@@ -287,11 +305,11 @@ model TourPricing {
 
 model CancellationPolicy {
   id          String @id @default(uuid())
-  description String
+  description String?
 
-  freeCancellationHours Int //Number of hours before the tour start time that cancellation is free. For example, if this is 24, then cancellation is free if done at least 24 hours before the tour start time.
-  partialRefundHours    Int //Number of hours before the tour start time that partial refund is given. For example, if this is 12, then partial refund is given if cancellation is done at least 12 hours before the tour start time but less than 24 hours before the tour start time.
-  refundPercentage      Int //Percentage of the total price that will be refunded for cancellations that qualify for partial refund. For example, if this is 50, then 50% of the total price will be refunded for cancellations that qualify for partial refund.
+  fullRefundHours Int 
+  partialRefundHours    Int 
+  partialRefundPercentage      Int 
 
   tourId String @unique
   tour   Tour   @relation(fields: [tourId], references: [id], onDelete: Cascade)
@@ -324,12 +342,14 @@ model Booking {
 
   rescheduleCount    Int       @default(0)
   lastRescheduleDate DateTime?
+
+  cancellationRefundType CancellationRefundType?
+  cancellationRefundPercentage  Int?
   canceledAt         DateTime?
 
   expiresAt DateTime?
 
   refundAmount Float?
-
   refundStatus RefundStatus?
 
   scheduleId String? //For package tours, this will be null and the schedule will be determined by the itinerary.
@@ -533,4 +553,10 @@ enum PaymentStatus {
   PAID
   EXPIRED
   FAILED
+}
+
+enum CancellationRefundType {
+  FULL
+  PARTIAL
+  NONE
 }

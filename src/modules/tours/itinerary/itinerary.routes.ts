@@ -5,7 +5,7 @@ import { replaceItinerary } from './itinerary.controller';
 
 export { Router } from 'express';
 
-const router = Router();
+const router = Router({ mergeParams: true });
 
 router.put('/', authenticate, requireAdmin, replaceItinerary);
 

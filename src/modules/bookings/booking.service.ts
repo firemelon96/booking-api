@@ -1,6 +1,6 @@
 import { eachDayOfInterval } from 'date-fns';
 import { prisma } from '../../config/prisma';
-import { Role } from '../../generated/prisma/enums';
+import { CancellationRefundType, Role } from '../../generated/prisma/enums';
 import { normalizeInterval } from '../../utils/helper';
 import { findTourOrFail } from '../tours/tour.query';
 import {
@@ -23,7 +23,10 @@ import {
 } from '../tours/capacity/capacity.query';
 import { calculate } from '../tours/pricing/pricing.query';
 import { logBookingAction } from './audit/booking-audit.service';
-import { findBookingOrThrow } from './booking.query';
+import {
+  calculateCancellationRefund,
+  findBookingOrThrow,
+} from './booking.query';
 
 export async function getAllBookings({
   userId,
@@ -330,6 +333,22 @@ export async function cancelbooked({
   const dates = eachDayOfInterval(interval);
 
   return prisma.$transaction(async (tx) => {
+    const policy = await tx.cancellationPolicy.findUnique({
+      where: { tourId: existingBooking.tourId },
+    });
+
+    if (!policy) {
+      throw new Error('Policy not found');
+    }
+
+    const { refundAmount, refundPercentage, refundType } =
+      calculateCancellationRefund({
+        bookingDate: existingBooking.createdAt,
+        tourStartDate: interval.start,
+        totalPrice: existingBooking.totalPrice || 0,
+        policy,
+      });
+
     await releaseCapacity({
       tx,
       dates,
@@ -342,6 +361,11 @@ export async function cancelbooked({
       where: { id: bookingId },
       data: {
         status: 'CANCELLED',
+        refundAmount,
+        refundStatus: 'PENDING',
+        canceledAt: new Date(),
+        cancellationRefundType: refundType as CancellationRefundType,
+        cancellationRefundPercentage: refundPercentage,
       },
     });
 

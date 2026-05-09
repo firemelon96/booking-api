@@ -66,6 +66,11 @@ export async function listTours({
       take: safeLimit,
       orderBy,
       include: {
+        _count: {
+          select: {
+            likes: true,
+          },
+        },
         pricing: {
           select: {
             price: true,
@@ -87,6 +92,7 @@ export async function listTours({
       mode: t.capacityMode,
       tourType: t.type,
       startsAt: `${t.pricing[0].price} ${t.pricing[0].pricingModel}`,
+      numberOfLikes: t._count,
     })),
     meta: {
       total,

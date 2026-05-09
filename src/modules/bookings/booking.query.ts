@@ -1,5 +1,5 @@
 import { prisma } from '../../config/prisma';
-import { Prisma, Role } from '../../generated/prisma/client';
+import { CancellationPolicy, Role } from '../../generated/prisma/client';
 
 export function detectOverbooking({
   capacity,
@@ -44,4 +44,46 @@ export async function findBookingOrThrow({
   }
 
   return booking;
+}
+
+export function calculateCancellationRefund({
+  bookingDate,
+  tourStartDate,
+  totalPrice,
+  policy,
+}: {
+  bookingDate: Date;
+  tourStartDate: Date;
+  totalPrice: number;
+  policy: CancellationPolicy;
+}) {
+  const now = bookingDate;
+
+  const diffMs = tourStartDate.getTime() - now.getTime();
+
+  const hoursBeforeTour = diffMs / (1000 * 60 * 60);
+
+  if (hoursBeforeTour >= policy.fullRefundHours) {
+    return {
+      refundType: 'FULL',
+      refundAmount: totalPrice,
+      refundPercentage: 100,
+    };
+  }
+
+  if (hoursBeforeTour >= policy.partialRefundHours) {
+    const amount = totalPrice * (policy.partialRefundPercentage / 100);
+
+    return {
+      refundType: 'PARTIAL',
+      refundAmount: amount,
+      refundPercentage: policy.partialRefundPercentage,
+    };
+  }
+
+  return {
+    refundType: 'NONE',
+    refundAmount: 0,
+    refundPercentage: 0,
+  };
 }

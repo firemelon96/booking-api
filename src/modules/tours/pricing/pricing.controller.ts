@@ -18,8 +18,6 @@ export async function replacePricing(
     throw new Error('Invalid params');
   }
 
-  console.log(tourId);
-
   try {
     const modified = await modifyPricing(tourId, payload.data);
 
