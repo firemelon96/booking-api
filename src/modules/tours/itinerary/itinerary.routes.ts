@@ -7,6 +7,6 @@ export { Router } from 'express';
 
 const router = Router();
 
-router.put('/itinerary', authenticate, requireAdmin, replaceItinerary);
+router.put('/', authenticate, requireAdmin, replaceItinerary);
 
 export default router;

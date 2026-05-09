@@ -6,5 +6,5 @@ export const userQuerySchema = z.object({
   limit: z.number().optional(),
   sort: z.string().optional(),
   search: z.string().optional(),
-  role: z.enum(Role),
+  role: z.enum(Role).optional(),
 });

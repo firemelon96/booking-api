@@ -2,12 +2,11 @@ import cloudinary from '../../config/cloudinary';
 import { prisma } from '../../config/prisma';
 
 import { slugify } from '../../utils/slugify';
-import { GetAllTourParamsType } from '../../validators/admin.schema';
 import { validateBaseTourRules } from './tour.rules';
 import { existingTourSlug, findTourOrFail } from './tour.query';
 import { createPricing } from './pricing/pricing.service';
 import { createItinerary } from './itinerary/itinerary.service';
-import { CreateTourType, UpdateTourType } from './tour.type';
+import { CreateTourType, TourParams, UpdateTourType } from './tour.type';
 import { attachImages } from './images/images.service';
 import { validateItineraryRules } from './itinerary/itinerary.rule';
 import { validatePricingRules } from './pricing/pricing.rule';
@@ -20,7 +19,7 @@ export async function listTours({
   capacityMode,
   duration,
   type,
-}: GetAllTourParamsType) {
+}: TourParams) {
   const safePage = Math.max(1, page);
   const safeLimit = Math.min(30, limit);
   const skip = (safePage - 1) * safeLimit;

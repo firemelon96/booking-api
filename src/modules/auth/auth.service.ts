@@ -92,7 +92,7 @@ export async function oauthLogin({
 export async function login({ email, password }: LoginInputType) {
   const user = await checkVerifiedUserEmail(email);
 
-  if (!user || !user.password) {
+  if (!user.password) {
     // const hashedPassword = await bcrypt.hash(password, 10);
 
     // await prisma.user.update({

@@ -37,11 +37,11 @@ export async function modifyItinerary(
   validateItineraryRules(tour.type, itinerary, tour.durationDays!);
 
   return prisma.$transaction(async (tx) => {
-    await tx.itinerary.deleteMany({ where: { tourId } });
+    await tx.itinerary.deleteMany({ where: { tourId: tour.id } });
 
-    return tx.itinerary.create({
+    await tx.itinerary.create({
       data: {
-        tourId,
+        tourId: tour.id,
         days: {
           create: itinerary.map((day) => ({
             dayNumber: day.dayNumber,
@@ -56,5 +56,7 @@ export async function modifyItinerary(
         },
       },
     });
+
+    return { success: true, message: 'Updated itinerary' };
   });
 }

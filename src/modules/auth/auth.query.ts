@@ -27,7 +27,11 @@ export async function oauthVerifier({
 export async function checkVerifiedUserEmail(email: string) {
   const user = await prisma.user.findUnique({ where: { email } });
 
-  if (!user?.emailVerified) throw new Error('Please verify your email first');
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  if (!user.emailVerified) throw new Error('Please verify your email first');
 
   return user;
 }

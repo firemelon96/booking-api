@@ -1,7 +1,7 @@
 import { prisma } from '../../config/prisma';
 
 export async function findTourOrFail(tourId: string) {
-  const tour = await prisma.tour.findUnique({
+  const tour = await prisma.tour.findFirst({
     where: { id: tourId },
     include: {
       pricing: true,

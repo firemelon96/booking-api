@@ -60,7 +60,7 @@ export async function addTour(req: Request, res: Response, next: NextFunction) {
   try {
     const created = await createFullTour(payload.data);
 
-    res.json(created);
+    res.status(201).json(created);
   } catch (error) {
     next(error);
   }

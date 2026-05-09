@@ -19,16 +19,21 @@ export async function createPricing(
 
 export async function modifyPricing(tourId: string, pricing: PricingType[]) {
   const tour = await findTourOrFail(tourId);
+  // const tour = await prisma.tour.findUnique({ where: { id: tourId } });
+
+  // if (!tour) {
+  //   throw new Error('Tour not found');
+  // }
 
   validatePricingRules(tour.capacityMode, pricing);
 
   return prisma.$transaction(async (tx) => {
-    await tx.tourPricing.deleteMany({ where: { tourId } });
+    await tx.tourPricing.deleteMany({ where: { tourId: tour.id } });
 
     return tx.tourPricing.createMany({
       data: pricing.map((p) => ({
         ...p,
-        tourId,
+        tourId: tour.id,
       })),
     });
   });

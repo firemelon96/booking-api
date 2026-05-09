@@ -4,7 +4,13 @@ import { CapacityMode } from '../../../generated/prisma/enums';
 
 export function validatePricingRules(
   capacityMode: CapacityMode,
-  pricing: PricingType[],
+  pricing: {
+    pricingType: 'JOINER' | 'PRIVATE';
+    minGroupSize: number;
+    maxGroupSize: number;
+    price: number;
+    pricingModel: 'PER_PERSON' | 'PER_GROUP';
+  }[],
 ) {
   if (!pricing.length) {
     throw new Error('Pricing is required');
