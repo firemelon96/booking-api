@@ -10,7 +10,8 @@ import tourRoutes from './modules/tours/tour.routes';
 import bookingRoutes from './modules/bookings/booking.route';
 import webhookRoutes from './modules/webhooks/xendit/xendit.route';
 import userRoutes from './modules/users/user.route';
-// import paymentRoutes from './routes/payment.routes';
+import amenityRoutes from './modules/amenity/amenity.route';
+import accommodationRoutes from './modules/accommodations/accommodation.route';
 
 import cookieParser from 'cookie-parser';
 import { errorHandler } from './middlewares/error.middleware';
@@ -38,6 +39,10 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/users', userRoutes);
 
 app.use('/api/webhook', webhookRoutes);
+
+app.use('/api/amenity', amenityRoutes);
+
+app.use('/api/accommodations', accommodationRoutes);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));

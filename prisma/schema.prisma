@@ -36,6 +36,10 @@ model User {
 
   likedTours  TourLike[]
 
+  accommodations  Accommodation[]
+
+  accommodationBookings AccommodationBooking[]
+
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 }
@@ -394,11 +398,13 @@ model BookingAuditLog {
 model Payment {
   id              String        @id @default(uuid())
   bookingId       String        @unique
+  accommodationId String        @unique
   xenditInvoiceId String
   invoiceUrl      String
   status          PaymentStatus @default(PENDING)
 
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  accommodationBooking  AccommodationBooking @relation(fields: [accommodationId], references: [id], onDelete: Cascade)
 }
 
 //================================
@@ -420,63 +426,267 @@ model Review {
   updatedAt DateTime @updatedAt
 }
 
-model Hotel {
+model Accommodation {
   id          String   @id @default(uuid())
-  name        String   @unique
-  address     String
-  description String
-  amenities   String[]
 
-  rooms    Room[]
-  policies Policy[]
+  name        String   
+  slug        String  @unique
+
+  type        AccommodationType
+  
+  description String?
+
+  address String?
+  city  String?
+  province  String?
+  country   String?
+
+  latitude  Float?
+  longitude Float?
+
+  checkInTime String?
+  checkOutTime  String?
+
+  hasUnits  Boolean @default(false)
+
+  isBookable Boolean @default(false)
+
+  maxGuests  Int?
+
+  basePrice Decimal? @db.Decimal(10,2)
+
+  status  AccommodationStatus @default(DRAFT)
+
+  ownerId String
+  owner User  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  units AccommodationUnit[]
+
+  images AccommodationImage[]
+
+  amenities AccommodationAmenity[]
+
+  bookings  AccommodationBooking[]
+
+  inventory AccommodationInventory[]
+
+  cancellationPolicy  AccommodationCancellationPolicy?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-model Room {
-  id              String   @id @default(uuid())
-  name            String   @unique
-  description     String
-  baseRate        Float
-  maxOccupancy    Int
-  roomType        RoomType
-  bedType         BedType
-  extraPersonRate Int
+model AccommodationUnit {
+  id    String  @id @default(uuid())
 
-  hotelId String
+  accommodationId String
+  accommodation Accommodation @relation(fields: [accommodationId], references: [id], onDelete: Cascade)
 
-  hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  name  String
+  slug String
+  description String?
 
-  createdAt DateTime @default(now())
-}
+  maxAdult Int
+  maxChildren Int?
 
-model Policy {
-  id           String @id @default(uuid())
-  checkIn      String
-  checkOut     String
-  cancellation String
-  child        String
-  reservation  String
-  pet          String
+  bedrooms Int?
+  bathrooms Int?
 
-  hotelId String
+  quantity  Int @default(1)
 
-  hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  basePrice Decimal @db.Decimal(10,2)
 
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   updatedAt DateTime @updatedAt
+
+  inventories AccommodationUnitInventory[]
+
+  bookings  AccommodationBooking[]
+
+  amenities  AccommodationUnitAmenity[]
+
+  images AccommodationUnitImage[]
+
+  @@unique([accommodationId, slug])
 }
 
-//================================
-// ENUMS
-//================================
-enum RoomType {
-  STUDIO
-  ENTIRE_HOUSE
-  LUXURY
-  FAMILY
+model Amenity {
+  id  String @id @default(uuid())
+
+  name  String  @unique
+  slug  String  @unique
+
+  icon  String?
+
+  createdAt DateTime  @default(now())
+
+  accommodations  AccommodationAmenity[]
+
+  units AccommodationUnitAmenity[]
 }
+
+model AccommodationImage {
+  id String @id @default(uuid())
+
+  accommodationId String
+  accommodation Accommodation @relation(fields: [accommodationId], references: [id], onDelete: Cascade)
+
+  url String
+
+  isFeatured Boolean @default(false)
+
+  sortOrder Int @default(0)
+
+  createdAt DateTime @default(now())
+}
+
+model AccommodationUnitImage {
+  id String @id @default(uuid())
+
+  unitId String
+  unit AccommodationUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  url String
+
+  isFeatured Boolean @default(false)
+
+  sortOrder Int @default(0)
+
+  createdAt DateTime @default(now())
+}
+
+model AccommodationAmenity {
+  accommodationId String
+  amenityId String
+
+  accomodation  Accommodation @relation(fields: [accommodationId], references: [id], onDelete: Cascade)
+  amenity Amenity @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+
+  @@id([accommodationId, amenityId])
+}
+
+model AccommodationUnitAmenity {
+  unitId  String
+  amenityId String
+
+  unit AccommodationUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  amenity Amenity @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+
+  @@id([unitId, amenityId])
+}
+
+model AccommodationInventory{
+  id  String @id @default(uuid())
+
+  accommodationId  String
+  accommodation  Accommodation @relation(fields: [accommodationId], references: [id], onDelete: Cascade)
+
+  date  DateTime
+
+  availableUnits Int
+  bookedUnits Int @default(1)
+
+  overridePrice Decimal? @db.Decimal(10,2)
+
+  isClosed Boolean @default(false)
+
+  @@unique([accommodationId, date])
+}
+
+model AccommodationUnitInventory{
+  id  String @id @default(uuid())
+
+  unitId  String
+  unit  AccommodationUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  date  DateTime
+
+  availableUnits Int
+  bookedUnits Int @default(1)
+
+  overridePrice Decimal? @db.Decimal(10,2)
+
+  isClosed Boolean @default(false)
+
+  @@unique([unitId, date])
+}
+
+model AccommodationBooking {
+  id  String  @id @default(uuid())
+
+  accommodationId String
+  accommodation Accommodation @relation(fields: [accommodationId], references: [id])
+
+  unitId  String?
+  unit  AccommodationUnit? @relation(fields: [unitId], references: [id])
+
+  userId  String
+  user  User  @relation(fields: [userId], references: [id])
+
+  checkIn DateTime
+  checkOut  DateTime
+
+  nights  Int
+
+  adults Int
+  children Int @default(0)
+
+  units Int @default(1)
+
+  totalPrice Decimal @db.Decimal(10,2)
+
+  bookingStatus BookingStatus @default(PENDING)
+  paymentStatus PaymentStatus @default(PENDING)
+
+  expiresAt DateTime
+
+  specialRequests String?
+
+  payment Payment?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model AccommodationCancellationPolicy{
+  id  String @id  @default(uuid())
+
+  description String?
+
+  fullRefundDays  Int
+  partialRefundDays Int
+
+  partialRefundPercentage Int
+
+  accommodationId String  @unique
+  accommodation Accommodation @relation(fields: [accommodationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+enum BookingType {
+  TOUR
+  ACCOMMODATION
+}
+
+enum AccommodationType {
+  HOTEL
+  RESORT
+  INN
+  APARTMENT
+  HOUSE
+  VILLA
+  HOMESTAY
+  HOSTEL
+}
+
+enum AccommodationStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
 
 enum BookingAction {
   CREATED
