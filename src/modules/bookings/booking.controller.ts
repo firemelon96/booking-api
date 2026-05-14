@@ -8,11 +8,12 @@ import {
 } from './booking.validators';
 import {
   cancelbooked,
-  createBooking,
   detailedBooking,
   getAllBookings,
+  getBookingByReference,
   rescheduleBooking,
 } from './booking.service';
+import { createBooking } from '../tours/booking/tour-booking.service';
 
 export async function listAllBookings(
   req: Request,
@@ -191,6 +192,25 @@ export async function bookingDetail(
     const booking = await detailedBooking(payload.data);
 
     return res.json(booking);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function referenceBooking(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  const { reference } = req.body;
+
+  if (!reference) {
+    throw new Error('Provide the booking reference');
+  }
+
+  try {
+    const bookingReference = await getBookingByReference(reference);
+    res.json(bookingReference);
   } catch (error) {
     next(error);
   }

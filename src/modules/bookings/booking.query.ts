@@ -1,5 +1,11 @@
+import z from 'zod';
 import { prisma } from '../../config/prisma';
-import { CancellationPolicy, Role } from '../../generated/prisma/client';
+import {
+  CancellationPolicy,
+  Prisma,
+  Role,
+} from '../../generated/prisma/client';
+import { generateBookingReference } from './booking.reference';
 
 export function detectOverbooking({
   capacity,
@@ -22,20 +28,21 @@ export async function findBookingOrThrow({
   role: Role;
   userId: string;
 }) {
-  let booking;
-
-  if (role === 'ADMIN') {
-    booking = await prisma.booking.findUnique({
-      where: {
-        id: bookingId,
-      },
-    });
-  }
-
-  booking = await prisma.booking.findFirst({
+  const booking = await prisma.booking.findUnique({
     where: {
       id: bookingId,
-      userId,
+      ...(role === 'USER' ? { userId } : {}),
+    },
+    include: {
+      tourBooking: {
+        select: { tour: true },
+      },
+      accommodationBooking: {
+        select: {
+          accommodation: true,
+          unit: true,
+        },
+      },
     },
   });
 
@@ -44,6 +51,27 @@ export async function findBookingOrThrow({
   }
 
   return booking;
+}
+
+export async function findTourBookingOrThrow({
+  bookingId,
+  userId,
+  role,
+}: {
+  bookingId: string;
+  userId: string;
+  role: Role;
+}) {
+  const tourBooking = await prisma.tourBooking.findUnique({
+    where: { bookingId, ...(role === 'USER' ? { userId } : {}) },
+    include: { booking: true, tour: true },
+  });
+
+  if (!tourBooking) {
+    throw new Error('Cannot find tour');
+  }
+
+  return tourBooking;
 }
 
 export function calculateCancellationRefund({
@@ -86,4 +114,22 @@ export function calculateCancellationRefund({
     refundAmount: 0,
     refundPercentage: 0,
   };
+}
+
+export async function createUniqueBookingReference(
+  tx: Prisma.TransactionClient,
+) {
+  while (true) {
+    const reference = generateBookingReference();
+
+    const existing = await tx.booking.findUnique({
+      where: {
+        reference,
+      },
+    });
+
+    if (!existing) {
+      return reference;
+    }
+  }
 }

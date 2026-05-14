@@ -3,7 +3,7 @@ import {
   eachDayOfInterval,
   isSameDay,
 } from 'date-fns';
-import { Booking } from '../../generated/prisma/client';
+import { Booking, TourBooking } from '../../generated/prisma/client';
 import { normalizeInterval } from '../../utils/helper';
 
 export const BOOKING_RULES = {
@@ -25,6 +25,10 @@ export function validateBookingRules({
   interval: { start: Date; end: Date };
 }) {
   const isSingleDay = interval.start.getTime() === interval.end.getTime();
+
+  if (interval.start.getTime() < new Date(Date.now()).getTime()) {
+    throw new Error('Unable to book past date');
+  }
 
   if (schedules.length === 0 && scheduleId) {
     throw new Error('This tour does not have schedules');
@@ -58,19 +62,26 @@ export function validateBookingRules({
 }
 
 export function validateRescheduleRules(
-  booking: Booking,
+  tourBooking: TourBooking & { booking: Booking },
   newInterval: { start: Date; end: Date },
   scheduleId?: string | null,
 ) {
-  if (booking.status === 'CANCELLED' || booking.status === 'EXPIRED') {
+  if (
+    tourBooking.booking.bookingStatus === 'CANCELLED' ||
+    tourBooking.booking.bookingStatus === 'EXPIRED' ||
+    tourBooking.booking.paymentStatus === 'PAID'
+  ) {
     throw new Error('Cannot reschedule this booking');
   }
 
-  if (booking.scheduleId && !scheduleId) {
+  if (tourBooking.scheduleId && !scheduleId) {
     throw new Error('Schedule is required');
   }
 
-  const oldInterval = normalizeInterval(booking.startDate, booking.endDate);
+  const oldInterval = normalizeInterval(
+    tourBooking.startDate,
+    tourBooking.endDate,
+  );
 
   if (oldInterval === newInterval) {
     throw new Error('No changes detected');
@@ -102,7 +113,8 @@ export function validateRescheduleRules(
   }
 
   const cutoff = new Date(
-    booking.startDate.getTime() - BOOKING_RULES.CUTOFF_HOURS * 60 * 60 * 1000,
+    tourBooking.startDate.getTime() -
+      BOOKING_RULES.CUTOFF_HOURS * 60 * 60 * 1000,
   );
 
   if (new Date() > cutoff) {
@@ -111,7 +123,7 @@ export function validateRescheduleRules(
     );
   }
 
-  if (booking.rescheduleCount > BOOKING_RULES.MAX_RESCHEDULES) {
+  if (tourBooking.booking.rescheduleCount > BOOKING_RULES.MAX_RESCHEDULES) {
     throw new Error(`Maximum reschedule reached.`);
   }
 
@@ -120,22 +132,24 @@ export function validateRescheduleRules(
 
 export function validateCancelRules({
   existingBooking,
+  tourBooking,
 }: {
   existingBooking: Booking;
+  tourBooking: TourBooking;
 }) {
   if (
-    existingBooking.status === 'CANCELLED' ||
-    existingBooking.status === 'EXPIRED'
+    existingBooking.bookingStatus === 'CANCELLED' ||
+    existingBooking.bookingStatus === 'EXPIRED'
   ) {
     return existingBooking;
   }
 
-  if (existingBooking.startDate < new Date()) {
+  if (tourBooking.startDate < new Date()) {
     throw new Error('Cannot cancel past bookings');
   }
 
   const cutoff = new Date(
-    existingBooking.startDate.getTime() -
+    tourBooking.startDate.getTime() -
       BOOKING_RULES.CUTOFF_HOURS * 60 * 60 * 1000,
   );
 

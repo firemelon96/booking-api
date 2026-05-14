@@ -128,6 +128,7 @@ export async function createFullTour(data: CreateTourType) {
     //create tour
     const tour = await tx.tour.create({
       data: {
+        ownerId: data.ownerId,
         slug,
         description: data.description,
         location: data.location,

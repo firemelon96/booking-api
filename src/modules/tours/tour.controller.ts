@@ -51,7 +51,12 @@ export async function getTourDetail(
 }
 
 export async function addTour(req: Request, res: Response, next: NextFunction) {
-  const payload = createFullTourSchema.safeParse(req.body);
+  const input = {
+    ownerId: req.user?.userId,
+    ...req.body,
+  };
+
+  const payload = createFullTourSchema.safeParse(input);
 
   if (!payload.success) {
     throw new Error('Invalid fields');

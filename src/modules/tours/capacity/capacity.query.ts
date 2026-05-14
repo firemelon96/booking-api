@@ -468,15 +468,12 @@ export async function assertBookingConflicts({
     }
 
     if (capacityMode === 'MIXED' && pricingType === 'JOINER') {
-      const hasPrivateBooking = await tx.booking.findFirst({
+      const hasPrivateBooking = await tx.tourBooking.findFirst({
         where: {
           tourId: row.tourId,
           scheduleId:
             ctx.scheduleKey === 'NO_SCHEDULE' ? null : ctx.scheduleKey,
           pricingType: 'PRIVATE',
-          status: {
-            in: ['PENDING', 'CONFIRMED'],
-          },
           startDate: {
             lte: date,
           },

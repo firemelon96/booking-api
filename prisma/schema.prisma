@@ -37,8 +37,7 @@ model User {
   likedTours  TourLike[]
 
   accommodations  Accommodation[]
-
-  accommodationBookings AccommodationBooking[]
+  tours Tour[]
 
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
@@ -120,6 +119,9 @@ model Tour {
   slug           String @unique
   joinerCapacity Int    @default(12)
 
+  ownerId String
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
   description  String
   highlights   String[]
   inclusions   String[]
@@ -139,7 +141,7 @@ model Tour {
   cancellationPolicy CancellationPolicy?
   capacity           TourDailyCapacity[]
   
-  bookings           Booking[]
+  tourBookings           TourBooking[]
 
   likes             TourLike[]
 
@@ -217,8 +219,7 @@ model TourScheduleOption {
 
   capacity Int?
 
-  schedules TourDailyCapacity[]
-  bookings  Booking[]
+  capacities TourDailyCapacity[]
 
   createdAt DateTime @default(now())
 }
@@ -322,49 +323,70 @@ model CancellationPolicy {
   updatedAt DateTime @updatedAt
 }
 
-//================================
-// BOOKING TABLES
-//================================
 model Booking {
-  id String @id @default(uuid())
+  id  String  @id @default(uuid())
 
-  userId String
-  tourId String
+  reference String @unique
+  type BookingType
 
-  pricingType  PricingType
-  participants Int
-  notes        String?
+  userId  String
+  user  User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  totalPrice Float?
-  status     BookingStatus @default(PENDING)
+  bookingStatus BookingStatus @default(PENDING)
+  paymentStatus PaymentStatus @default(PENDING)
 
-  isOverbooked Boolean @default(false)
+  totalPrice  Decimal @db.Decimal(12,2)
+
+  expiresAt DateTime?
+
+  cancelledAt DateTime?
+  cancellationReason  String?
+
   isAdminOverride Boolean @default(false)
-
-  startDate DateTime
-  endDate   DateTime?
 
   rescheduleCount    Int       @default(0)
   lastRescheduleDate DateTime?
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   cancellationRefundType CancellationRefundType?
   cancellationRefundPercentage  Int?
-  canceledAt         DateTime?
-
-  expiresAt DateTime?
-
-  refundAmount Float?
+  refundAmount Decimal? @db.Decimal(12,2)
   refundStatus RefundStatus?
 
-  scheduleId String? //For package tours, this will be null and the schedule will be determined by the itinerary.
+  tourBooking TourBooking?
+
+  accommodationBooking AccommodationBooking?
 
   payment Payment?
 
-  user     User                @relation(fields: [userId], references: [id], onDelete: Restrict)
-  tour     Tour                @relation(fields: [tourId], references: [id], onDelete: Restrict)
-  schedule TourScheduleOption? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  auditLog  BookingAuditLog[]
+}
 
-  logs BookingAuditLog[]
+//================================
+// BOOKING TABLES
+//================================
+model TourBooking {
+  id String @id @default(uuid())
+
+  bookingId String @unique
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  tourId String
+  tour     Tour  @relation(fields: [tourId], references: [id])
+
+  pricingType  PricingType
+  participants Int
+
+  startDate DateTime
+  endDate   DateTime?
+
+  notes        String?
+
+  scheduleId String? 
+  
+  isOverbooked Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -377,7 +399,10 @@ model Booking {
 //================================
 model BookingAuditLog {
   id            String        @id @default(uuid())
+
   bookingId     String
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  
   actorId       String //userid
   actorType     Role //USER or ADMIN
   action        BookingAction //e.g. CREATED, RESCHEDULED, CANCELLED
@@ -389,7 +414,6 @@ model BookingAuditLog {
 
   createdAt DateTime @default(now())
 
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 }
 
 //================================
@@ -398,13 +422,12 @@ model BookingAuditLog {
 model Payment {
   id              String        @id @default(uuid())
   bookingId       String        @unique
-  accommodationId String        @unique
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
   xenditInvoiceId String
   invoiceUrl      String
-  status          PaymentStatus @default(PENDING)
+  paymentStatus          PaymentStatus @default(PENDING)
 
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  accommodationBooking  AccommodationBooking @relation(fields: [accommodationId], references: [id], onDelete: Cascade)
 }
 
 //================================
@@ -614,35 +637,25 @@ model AccommodationUnitInventory{
 model AccommodationBooking {
   id  String  @id @default(uuid())
 
+  bookingId String @unique
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
   accommodationId String
   accommodation Accommodation @relation(fields: [accommodationId], references: [id])
 
   unitId  String?
   unit  AccommodationUnit? @relation(fields: [unitId], references: [id])
 
-  userId  String
-  user  User  @relation(fields: [userId], references: [id])
-
   checkIn DateTime
   checkOut  DateTime
 
   nights  Int
 
-  adults Int
-  children Int @default(0)
+  guests Int
 
-  units Int @default(1)
-
-  totalPrice Decimal @db.Decimal(10,2)
-
-  bookingStatus BookingStatus @default(PENDING)
-  paymentStatus PaymentStatus @default(PENDING)
-
-  expiresAt DateTime
+  units Int 
 
   specialRequests String?
-
-  payment Payment?
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
