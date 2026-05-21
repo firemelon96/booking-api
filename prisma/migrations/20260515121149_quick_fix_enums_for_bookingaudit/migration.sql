@@ -1,0 +1,5 @@
+-- AlterEnum
+ALTER TYPE "BookingAction" ADD VALUE 'PAYMENT_WEBHOOK_UPDATED';
+
+-- AlterEnum
+ALTER TYPE "Role" ADD VALUE 'SYSTEM';

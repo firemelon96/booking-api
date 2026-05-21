@@ -1,11 +1,8 @@
 import z from 'zod';
-import { Role } from '../../../generated/prisma/enums';
 
 export const createAccommodationBookingSchema = z
   .object({
-    accommodationId: z.uuid(),
     unitId: z.uuid().optional(),
-    userId: z.uuid(),
     checkIn: z.coerce.date(),
     checkOut: z.coerce.date(),
     adults: z.number(),
@@ -18,15 +15,11 @@ export const createAccommodationBookingSchema = z
     path: ['checkOut'],
   });
 
-export const rescheduleAccommodationBookingSchema = z
-  .object({
-    bookingId: z.uuid(),
-    checkIn: z.coerce.date(),
-    checkOut: z.coerce.date(),
-    role: z.enum(Role),
-    userId: z.uuid(),
-  })
-  .refine((a) => a.checkOut > a.checkIn, {
-    message: 'Check out must be after check in',
-    path: ['checkOut'],
-  });
+export const rescheduleAccommodationBookingSchema = z.object({
+  checkIn: z.coerce.date(),
+  checkOut: z.coerce.date(),
+});
+
+export const accommodationIdParams = z.object({
+  accommodationId: z.uuid(),
+});

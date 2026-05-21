@@ -1,6 +1,51 @@
 import { Request, Response, NextFunction } from 'express';
-import { createAccommodationBookingSchema } from './accommodation-booking.validator';
-import { createBookingService } from './accommodation-booking.service';
+import {
+  accommodationIdParams,
+  createAccommodationBookingSchema,
+} from './accommodation-booking.validator';
+import { createAccommodationBookingService } from './accommodation-booking.service';
+import { userIdSchema } from '../../users/user.validation';
+
+export async function adminCreateAccommodationBooking(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  const { accommodationId, ...rest } = req.body;
+
+  if (!req.user) {
+    throw new Error('Unauthorized');
+  }
+
+  const userId = userIdSchema.safeParse(req.user.userId);
+
+  if (!accommodationId) {
+    throw new Error('Invalid accommodation provided');
+  }
+
+  if (!userId.success) {
+    throw new Error('Unauthorized');
+  }
+
+  const payload = createAccommodationBookingSchema.safeParse(rest);
+
+  if (!payload.success) {
+    throw new Error('Invalid fields');
+  }
+
+  try {
+    const createBooking = await createAccommodationBookingService(
+      accommodationId,
+      userId.data.userId,
+      req.user.role,
+      payload.data,
+    );
+
+    res.json(createBooking);
+  } catch (error) {
+    next(error);
+  }
+}
 
 export async function createBookingController(
   req: Request,
@@ -11,30 +56,37 @@ export async function createBookingController(
     throw new Error('Unauthorized');
   }
 
-  const { accommodationId } = req.params;
-  const { userId } = req.user;
+  const userId = userIdSchema.safeParse(req.user.userId);
+  const accommodationId = accommodationIdParams.safeParse(
+    req.params.accommodationId,
+  );
 
-  if (Array.isArray(accommodationId)) {
-    throw new Error('Invalid params');
+  if (!accommodationId.success) {
+    throw new Error('Invalid accommodation');
   }
 
-  const input = {
-    accommodationId,
-    userId,
-    ...req.body,
-  };
+  if (!userId.success) {
+    throw new Error('Unauthorized');
+  }
 
-  const payload = createAccommodationBookingSchema.safeParse(input);
+  const payload = createAccommodationBookingSchema.safeParse(req.body);
 
   if (!payload.success) {
     throw new Error('Invalid fields');
   }
 
   try {
-    const createBooking = await createBookingService(payload.data);
+    const createBooking = await createAccommodationBookingService(
+      accommodationId.data.accommodationId,
+      userId.data.userId,
+      req.user.role,
+      payload.data,
+    );
 
     res.json(createBooking);
   } catch (error) {
     next(error);
   }
 }
+
+export async function reschedBookingController() {}

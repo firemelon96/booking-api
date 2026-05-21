@@ -8,6 +8,6 @@ export type CreateAccommodationBookingType = z.infer<
   typeof createAccommodationBookingSchema
 >;
 
-export type RescheduleAccommodationBookingType = z.infer<
+export type RescheduleAccommodationPayload = z.infer<
   typeof rescheduleAccommodationBookingSchema
 >;

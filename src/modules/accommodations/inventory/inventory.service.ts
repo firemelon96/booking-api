@@ -1,4 +1,5 @@
 import { Prisma } from '../../../generated/prisma/client';
+import { logAdminWarning } from '../../logs/admin-warning.service';
 
 export async function ensureAccommodationInventoryRows(
   tx: Prisma.TransactionClient,
@@ -77,7 +78,12 @@ export async function reserveAccommodationInventory(
 
 export async function reserveUnitInventory(
   tx: Prisma.TransactionClient,
-  { unitId, dates, units }: { unitId: string; dates: Date[]; units: number },
+  {
+    unitId,
+    dates,
+    units,
+    isAdmin,
+  }: { unitId: string; dates: Date[]; units: number; isAdmin: boolean },
 ) {
   for (const date of dates) {
     const row = await tx.accommodationUnitInventory.findFirst({
@@ -92,25 +98,37 @@ export async function reserveUnitInventory(
     }
 
     if (row.isClosed) {
-      throw new Error('Date is closed');
+      if (!isAdmin) {
+        throw new Error('Date is closed');
+      }
+
+      // await logAdminWarning({
+      //   tx,
+      //   actionType: 'BOOKED_ON_CLOSED_DATE',
+      //   message: `Admin booked accommodation on closed date ${row.date}`,
+      // });
     }
 
     const remaining = row.availableUnits - row.bookedUnits;
 
     if (remaining < units) {
-      throw new Error('Unit is fully booked');
-    }
+      if (!isAdmin) {
+        throw new Error('Unit is fully booked');
+      }
 
-    await tx.accommodationUnitInventory.update({
-      where: {
-        id: row.id,
-      },
-      data: {
-        bookedUnits: {
-          increment: units,
+      // await logAdminWarning({})
+
+      await tx.accommodationUnitInventory.update({
+        where: {
+          id: row.id,
         },
-      },
-    });
+        data: {
+          bookedUnits: {
+            increment: units,
+          },
+        },
+      });
+    }
   }
 }
 

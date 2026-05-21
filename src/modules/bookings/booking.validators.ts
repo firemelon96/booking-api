@@ -1,6 +1,9 @@
 import z from 'zod';
 import { BookingStatus, PricingType, Role } from '../../generated/prisma/enums';
-import path from 'node:path';
+
+export const bookingIdParams = z.object({
+  bookingId: z.string(),
+});
 
 export const bookingQuerySchema = z.object({
   page: z.number().optional(),
@@ -13,6 +16,16 @@ export const bookingQuerySchema = z.object({
   endDate: z.coerce.date().optional(),
   userId: z.string(),
   role: z.enum(Role),
+});
+
+export const reschedulBookingSchema = z.object({
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
+  scheduleId: z.string().optional(),
+
+  checkIn: z.coerce.date().optional(),
+  checkOut: z.coerce.date().optional(),
+  reason: z.string().optional(),
 });
 
 export const createBookingSchema = z
@@ -42,37 +55,8 @@ export const createBookingSchema = z
     },
   );
 
-export const reschedulBookingSchema = z
-  .object({
-    role: z.enum(Role),
-    bookingId: z.uuid(),
-    userId: z.uuid(),
-    newStartDate: z.coerce.date(),
-    newEndDate: z.coerce.date().optional(),
-    scheduleId: z.string().optional(),
-    reason: z.string().optional(),
-  })
-  .transform((data) => ({
-    ...data,
-    newEndDate: data.newEndDate ?? data.newStartDate,
-  }))
-  .refine(
-    (d) => {
-      if (!d.newEndDate) return true;
-      return (
-        new Date(d.newEndDate).getTime() >= new Date(d.newStartDate).getTime()
-      );
-    },
-    {
-      message: 'End date must be Greater than the start date',
-      path: ['endDate'],
-    },
-  );
-
-export const cancelBookingSchema = z.object({
+export const bookingSchema = z.object({
   bookingId: z.string(),
   userId: z.string(),
   role: z.enum(Role),
 });
-
-export const bookingDetailsSchema = cancelBookingSchema;

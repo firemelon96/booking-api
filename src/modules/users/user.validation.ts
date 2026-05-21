@@ -8,3 +8,7 @@ export const userQuerySchema = z.object({
   search: z.string().optional(),
   role: z.enum(Role).optional(),
 });
+
+export const userIdSchema = z.object({
+  userId: z.uuid(),
+});

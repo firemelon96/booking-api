@@ -126,53 +126,6 @@ export async function reserveCapacity({
   };
 }
 
-async function reserveExclusive({
-  tx,
-  dates,
-  ctx,
-  isAdmin,
-}: {
-  tx: Prisma.TransactionClient;
-  dates: Date[];
-  ctx: CapacityCtx;
-  isAdmin: boolean;
-}) {
-  for (const date of dates) {
-    if (isAdmin) {
-      //allow override
-      await tx.tourDailyCapacity.updateMany({
-        where: {
-          date,
-          scheduleKey: ctx.scheduleKey,
-        },
-        data: {
-          booked: 1,
-          capacity: 1,
-        },
-      });
-      continue;
-    }
-
-    const updated = await tx.tourDailyCapacity.updateMany({
-      where: {
-        date,
-        scheduleKey: ctx.scheduleKey,
-        booked: 0,
-      },
-      data: {
-        booked: 1,
-        capacity: 1,
-      },
-    });
-
-    if (updated.count === 0) {
-      throw new Error('Date is already booked');
-    }
-  }
-
-  return { hasOverbooking: false };
-}
-
 async function reserveShared({
   tx,
   dates,
@@ -261,75 +214,6 @@ async function reserveShared({
   }
 
   return { hasOverbooking };
-}
-
-async function reservePrivate({
-  tx,
-  dates,
-  ctx,
-  isAdmin,
-  userId,
-}: {
-  tx: Prisma.TransactionClient;
-  dates: Date[];
-  ctx: CapacityCtx;
-  isAdmin: boolean;
-  userId: string;
-}) {
-  for (const date of dates) {
-    const row = ctx.map.get(startOfDay(date).getTime());
-
-    if (!row) {
-      throw new Error('Capacity row not found');
-    }
-
-    if (isAdmin && row.booked > 0) {
-      await logAdminWarning({
-        tx,
-        actionType: 'FORCED_PRIVATE',
-        message: 'Admin forced private over joiners',
-        tourId: row.tourId,
-        actorId: userId,
-        metadata: {
-          date,
-          existingBooked: row.booked,
-        },
-      });
-    }
-
-    if (isAdmin) {
-      await tx.tourDailyCapacity.updateMany({
-        where: {
-          date,
-          scheduleKey: ctx.scheduleKey,
-        },
-        data: {
-          booked: row.capacity,
-        },
-      });
-      continue;
-    }
-
-    const updated = await tx.tourDailyCapacity.updateMany({
-      where: {
-        tourId: row.tourId,
-        date,
-        scheduleKey: ctx.scheduleKey,
-        booked: 0,
-      },
-      data: {
-        booked: row.capacity,
-      },
-    });
-
-    if (updated.count === 0) {
-      throw new Error(
-        'Cannot reserve private capacity as the date is already booked',
-      );
-    }
-  }
-
-  return { hasOverbooking: false };
 }
 
 export async function releaseCapacity({

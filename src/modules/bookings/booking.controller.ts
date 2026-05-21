@@ -1,9 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import {
-  bookingDetailsSchema,
+  bookingIdParams,
   bookingQuerySchema,
-  cancelBookingSchema,
-  createBookingSchema,
+  bookingSchema,
   reschedulBookingSchema,
 } from './booking.validators';
 import {
@@ -13,7 +12,8 @@ import {
   getBookingByReference,
   rescheduleBooking,
 } from './booking.service';
-import { createBooking } from '../tours/booking/tour-booking.service';
+import { createTourBooking } from '../tours/booking/tour-booking.service';
+import { createTourBookingSchema } from '../tours/booking/tour-booking-validator';
 
 export async function listAllBookings(
   req: Request,
@@ -45,6 +45,7 @@ export async function listAllBookings(
   }
 }
 
+//this should create for both the tour and accommodation
 export async function adminCreateBooking(
   req: Request,
   res: Response,
@@ -54,20 +55,30 @@ export async function adminCreateBooking(
     throw new Error('Unauthorized');
   }
 
-  const inputs = {
-    ...req.body,
-    role: req.user.role,
-    userId: req.user.userId,
-  };
+  if (Array.isArray(req.params.tourId)) {
+    throw new Error('Invalid params');
+  }
 
-  const payload = createBookingSchema.safeParse(inputs);
+  const { tourId, ...rest } = req.body;
+
+  if (!tourId) {
+    throw new Error('Tour id must be provided');
+  }
+
+  //should accept both tour and accoms
+  const payload = createTourBookingSchema.safeParse(rest);
 
   if (!payload.success) {
     throw new Error('Invalid fields');
   }
 
   try {
-    const booking = await createBooking(payload.data);
+    const booking = await createTourBooking(
+      tourId,
+      req.user.userId,
+      req.user.role,
+      payload.data,
+    );
 
     res.json(booking);
   } catch (error) {
@@ -84,21 +95,23 @@ export async function userCreateBooking(
     throw new Error('Unauthorized');
   }
 
-  const inputs = {
-    ...req.body,
-    userId: req.user.userId,
-    tourId: req.params.tourId,
-    role: req.user.role,
-  };
+  if (Array.isArray(req.params.tourId)) {
+    throw new Error('Invalid params');
+  }
 
-  const payload = createBookingSchema.safeParse(inputs);
+  const payload = createTourBookingSchema.safeParse(req.body);
 
   if (!payload.success) {
     throw new Error('Invalid fields');
   }
 
   try {
-    const booking = await createBooking(payload.data);
+    const booking = await createTourBooking(
+      req.params.tourId,
+      req.user.userId,
+      req.user.role,
+      payload.data,
+    );
 
     res.json(booking);
   } catch (error) {
@@ -115,21 +128,25 @@ export async function reschedBooking(
     throw new Error('Unauthorized');
   }
 
-  const inputs = {
-    ...req.params,
-    ...req.body,
-    userId: req.user.userId,
-    role: req.user.role,
-  };
+  const params = bookingIdParams.safeParse(req.params);
 
-  const payload = reschedulBookingSchema.safeParse(inputs);
+  if (!params.success) {
+    throw new Error('Invalid params');
+  }
+
+  const payload = reschedulBookingSchema.safeParse(req.body);
 
   if (!payload.success) {
     throw new Error('Invalid fields');
   }
 
   try {
-    const booking = await rescheduleBooking(payload.data);
+    const booking = await rescheduleBooking(
+      params.data.bookingId,
+      req.user.userId,
+      req.user.role,
+      payload.data,
+    );
 
     res.json(booking);
   } catch (error) {
@@ -152,7 +169,7 @@ export async function cancelBooking(
     role: req.user.role,
   };
 
-  const payload = cancelBookingSchema.safeParse(input);
+  const payload = bookingSchema.safeParse(input);
 
   if (!payload.success) {
     throw new Error('Invalid fields');
@@ -182,7 +199,7 @@ export async function bookingDetail(
     role: req.user.role,
   };
 
-  const payload = bookingDetailsSchema.safeParse(input);
+  const payload = bookingSchema.safeParse(input);
 
   if (!payload.success) {
     throw new Error('Invalid fields');
@@ -205,7 +222,7 @@ export async function referenceBooking(
   const { reference } = req.body;
 
   if (!reference) {
-    throw new Error('Provide the booking reference');
+    throw new Error('provide reference');
   }
 
   try {

@@ -9,7 +9,7 @@ export async function logBookingAction({
   action,
 }: {
   tx: Prisma.TransactionClient;
-  userId: string;
+  userId?: string;
   role: Role;
   newValue: any;
   previousValue?: any;

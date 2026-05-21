@@ -4,11 +4,9 @@ import { CancellationRefundType, Role } from '../../generated/prisma/enums';
 import { normalizeInterval } from '../../utils/helper';
 import { findTourOrFail } from '../tours/tour.query';
 import {
-  BookingCancelInput,
-  BookingCreateInput,
-  BookingDetailInput,
+  BookingInputType,
   BookingQueryType,
-  BookingReschedInput,
+  RescheduleBookingPayload,
 } from './booking.type';
 import {
   validateBookingRules,
@@ -179,33 +177,25 @@ export async function getBookingByReference(reference: string) {
   }
 }
 
-export async function rescheduleBooking({
-  bookingId,
-  newEndDate,
-  newStartDate,
-  scheduleId,
-  userId,
-  role,
-}: BookingReschedInput) {
+export async function rescheduleBooking(
+  bookingId: string,
+  userId: string,
+  role: Role,
+  payload: RescheduleBookingPayload,
+) {
   const booking = await findBookingOrThrow({ bookingId, role, userId });
 
   switch (booking.type) {
     case 'ACCOMMODATION':
-      return reschedAccommodationBooking({
-        bookingId,
-        checkIn: newStartDate,
-        checkOut: newEndDate,
-        role,
-        userId,
+      return reschedAccommodationBooking(bookingId, userId, role, {
+        checkIn: payload.checkIn!,
+        checkOut: payload.checkOut!,
       });
     case 'TOUR':
-      return rescheduleTourBooking({
-        bookingId,
-        newEndDate,
-        newStartDate,
-        role,
-        userId,
-        scheduleId,
+      return rescheduleTourBooking(bookingId, userId, role, {
+        newEndDate: payload.endDate!,
+        newStartDate: payload.startDate!,
+        scheduleId: payload.scheduleId,
       });
 
     default:
@@ -217,7 +207,7 @@ export async function cancelbooked({
   bookingId,
   userId,
   role,
-}: BookingCancelInput) {
+}: BookingInputType) {
   const tourBooking = await findTourBookingOrThrow({
     bookingId,
     userId,
@@ -291,7 +281,7 @@ export async function detailedBooking({
   bookingId,
   userId,
   role,
-}: BookingDetailInput) {
+}: BookingInputType) {
   const booking = await findBookingOrThrow({ bookingId, role, userId });
 
   switch (booking.type) {

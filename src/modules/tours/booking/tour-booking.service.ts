@@ -2,15 +2,13 @@ import { eachDayOfInterval } from 'date-fns';
 import { normalizeInterval } from '../../../utils/helper';
 import {
   validateBookingRules,
+  validateCancelRules,
   validateRescheduleRules,
 } from '../../bookings/booking.rule';
-import {
-  BookingCreateInput,
-  BookingReschedInput,
-} from '../../bookings/booking.type';
 import { findTourOrFail } from '../tour.query';
 import { prisma } from '../../../config/prisma';
 import {
+  calculateCancellationRefund,
   createUniqueBookingReference,
   findTourBookingOrThrow,
 } from '../../bookings/booking.query';
@@ -23,18 +21,26 @@ import {
 } from '../capacity/capacity.query';
 import { calculate } from '../pricing/pricing.query';
 import { logBookingAction } from '../../bookings/audit/booking-audit.service';
+import { CancellationRefundType, Role } from '../../../generated/prisma/enums';
+import {
+  TourBookingCreateInput,
+  TourReschedPayload,
+} from './tour-booking-types';
+import { BookingInputType } from '../../bookings/booking.type';
 
-export async function createBooking({
-  startDate,
-  endDate,
-  participants,
-  pricingType,
-  tourId,
-  notes,
-  scheduleId,
-  userId,
-  role,
-}: BookingCreateInput) {
+export async function createTourBooking(
+  tourId: string,
+  userId: string,
+  role: Role,
+  {
+    startDate,
+    endDate,
+    participants,
+    pricingType,
+    notes,
+    scheduleId,
+  }: TourBookingCreateInput,
+) {
   const interval = normalizeInterval(startDate, endDate);
   const tour = await findTourOrFail(tourId);
 
@@ -126,14 +132,13 @@ export async function createBooking({
   });
 }
 
-export async function rescheduleTourBooking({
-  bookingId,
-  newEndDate,
-  newStartDate,
-  scheduleId,
-  userId,
-  role,
-}: BookingReschedInput) {
+export async function rescheduleTourBooking(
+  bookingId: string,
+  userId: string,
+  role: Role,
+  payload: TourReschedPayload,
+) {
+  const { newStartDate, newEndDate, scheduleId } = payload;
   const tourBooking = await findTourBookingOrThrow({
     bookingId,
     role,
@@ -225,5 +230,79 @@ export async function rescheduleTourBooking({
     });
 
     return resched;
+  });
+}
+
+export async function cancelTourbooking({
+  bookingId,
+  userId,
+  role,
+}: BookingInputType) {
+  const tourBooking = await findTourBookingOrThrow({
+    bookingId,
+    userId,
+    role,
+  });
+
+  validateCancelRules({
+    existingBooking: tourBooking.booking,
+    tourBooking,
+  });
+
+  const interval = normalizeInterval(
+    tourBooking.startDate,
+    tourBooking.endDate,
+  );
+
+  const dates = eachDayOfInterval(interval);
+
+  return prisma.$transaction(async (tx) => {
+    const policy = await tx.cancellationPolicy.findUnique({
+      where: { tourId: tourBooking.tourId },
+    });
+
+    if (!policy) {
+      throw new Error('Policy not found');
+    }
+
+    const { refundAmount, refundPercentage, refundType } =
+      calculateCancellationRefund({
+        bookingDate: tourBooking.createdAt,
+        tourStartDate: interval.start,
+        totalPrice: Number(tourBooking.booking.totalPrice),
+        policy,
+      });
+
+    await releaseCapacity({
+      tx,
+      dates,
+      participants: tourBooking.participants,
+      tourId: tourBooking.tourId,
+      scheduleId: tourBooking.scheduleId,
+    });
+
+    const cancelled = await tx.booking.update({
+      where: { id: bookingId },
+      data: {
+        type: 'TOUR',
+        bookingStatus: 'CANCELLED',
+        refundAmount,
+        refundStatus: 'PENDING',
+        canceledAt: new Date(),
+        cancellationRefundType: refundType as CancellationRefundType,
+        cancellationRefundPercentage: refundPercentage,
+        isAdminOverride: role === 'ADMIN',
+      },
+    });
+
+    await logBookingAction({
+      tx,
+      userId,
+      role,
+      newValue: cancelled,
+      action: 'CANCELLED',
+    });
+
+    return cancelled;
   });
 }

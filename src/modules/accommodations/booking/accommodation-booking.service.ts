@@ -1,10 +1,17 @@
 import { prisma } from '../../../config/prisma';
-import { BookingStatus, PaymentStatus } from '../../../generated/prisma/enums';
+import {
+  BookingStatus,
+  PaymentStatus,
+  Role,
+} from '../../../generated/prisma/enums';
 import { logBookingAction } from '../../bookings/audit/booking-audit.service';
 import {
   createUniqueBookingReference,
   findBookingOrThrow,
 } from '../../bookings/booking.query';
+import { createRescheduleAdjustmentPayment } from '../../bookings/payment/payment.query';
+import { logAdminWarning } from '../../logs/admin-warning.service';
+import { createXenditInvoice } from '../../webhooks/xendit/xendit.service';
 import { findAccommodationOrFail } from '../accommodation.query';
 import {
   lockAccommodationInventory,
@@ -23,25 +30,28 @@ import {
 } from '../inventory/inventory.service';
 import {
   CreateAccommodationBookingType,
-  RescheduleAccommodationBookingType,
+  RescheduleAccommodationPayload,
 } from './accommodation-booking.type';
 import { getNightCount, getStayDates } from './accommodation-booking.utils';
 import { findAccommodationBookingOrThrow } from './accommodation.query';
 
-export async function createBookingService(
+export async function createAccommodationBookingService(
+  accommodationId: string,
+  userId: string,
+  role: Role,
   data: CreateAccommodationBookingType,
 ) {
   const {
     checkIn,
     checkOut,
-    accommodationId,
-    userId,
     units,
     adults,
     specialRequests,
     unitId,
     children,
   } = data;
+
+  const isAdmin = role === 'ADMIN';
 
   const accommodation = await findAccommodationOrFail(accommodationId);
 
@@ -78,11 +88,15 @@ export async function createBookingService(
         throw new Error('Unit not found');
       }
 
-      if (
-        adults > selectedUnit.maxAdult ||
-        (children && children > (selectedUnit.maxChildren ?? 0))
-      ) {
-        throw new Error('Guest count exceeds unit limit');
+      const maxUnitGuest =
+        selectedUnit.maxAdult + (selectedUnit.maxChildren ?? 0);
+
+      if (guests > maxUnitGuest) {
+        if (!isAdmin) {
+          throw new Error('Guest count exceeds unit limit');
+        }
+
+        // await logAdminWarning({})
       }
 
       await ensureUnitInventoryRows(tx, {
@@ -91,13 +105,20 @@ export async function createBookingService(
         dates,
       });
 
-      await reserveUnitInventory(tx, { unitId, dates, units });
+      await lockUnitInventory(tx, {
+        unitId,
+        dates,
+      });
+
+      await reserveUnitInventory(tx, { unitId, dates, units, isAdmin });
     } else {
       if (guests > (accommodation.maxGuests ?? 0)) {
         throw new Error('Guest count exceeds accommodation limit');
       }
 
       await ensureAccommodationInventoryRows(tx, { accommodationId, dates });
+
+      await lockAccommodationInventory(tx, { accommodationId, dates });
 
       await reserveAccommodationInventory(tx, {
         accommodationId,
@@ -149,23 +170,26 @@ export async function createBookingService(
   });
 }
 
-export async function reschedAccommodationBooking({
-  bookingId,
-  checkIn,
-  checkOut,
-  role,
-  userId,
-}: RescheduleAccommodationBookingType) {
+export async function reschedAccommodationBooking(
+  bookingId: string,
+  userId: string,
+  role: Role,
+  payload: RescheduleAccommodationPayload,
+) {
+  const isAdmin = role === 'ADMIN';
+  const { checkIn, checkOut } = payload;
+
   const accommodationBooking = await findAccommodationBookingOrThrow({
     bookingId,
     role,
     userId,
   });
 
+  const booking = accommodationBooking.booking;
   const accommodationId = accommodationBooking.accommodationId;
   const unitId = accommodationBooking.unitId;
 
-  if (accommodationBooking.booking.bookingStatus === 'CANCELLED') {
+  if (booking.bookingStatus === 'CANCELLED') {
     throw new Error('Cannot reschedule cancelled booking');
   }
 
@@ -204,6 +228,7 @@ export async function reschedAccommodationBooking({
         unitId,
         dates: newDates,
         units: accommodationBooking.units,
+        isAdmin,
       });
     } else {
       await lockAccommodationInventory(tx, {
@@ -234,20 +259,38 @@ export async function reschedAccommodationBooking({
       });
     }
 
-    // const totalPrice = await calculateAccommodationPricing(tx, {
-    //   accommodation: accommodationBooking.accommodation,
-    //   unit: accommodationBooking.unit,
-    //   dates: newDates,
-    //   units: accommodationBooking.units,
-    // });
+    const newTotalPrice = await calculateAccommodationPricing(tx, {
+      accommodation: accommodationBooking.accommodation,
+      unit: accommodationBooking.unit,
+      dates: newDates,
+      units: accommodationBooking.units,
+    });
 
-    const updatedBooking = await tx.booking.update({
-      where: { id: bookingId },
+    const oldPrice = Number(booking.totalPrice);
+    const priceDifference = newTotalPrice - oldPrice;
+
+    if (priceDifference < 0) {
+      throw new Error('Automatic refund on reschedule is not yet upported');
+    }
+
+    let bookingStatus = booking.bookingStatus;
+
+    if (priceDifference > 0) {
+      bookingStatus = 'PENDING';
+    }
+
+    const updateBooking = await tx.booking.update({
+      where: {
+        id: bookingId,
+      },
       data: {
         type: 'ACCOMMODATION',
         rescheduleCount: { increment: 1 },
         lastRescheduleDate: new Date(),
         isAdminOverride: role === 'ADMIN',
+        remainingBalance: Number(booking.remainingBalance) + priceDifference,
+        totalPrice: newTotalPrice,
+        bookingStatus,
       },
     });
 
@@ -260,15 +303,46 @@ export async function reschedAccommodationBooking({
       },
     });
 
+    let paymentTransaction = null;
+
+    if (priceDifference > 0) {
+      paymentTransaction = await createRescheduleAdjustmentPayment({
+        tx,
+        amount: priceDifference,
+        bookingId,
+        customer: {
+          givenName: booking.user ?? 'Guest',
+          email: booking.user.email,
+        },
+      });
+    }
+
     await logBookingAction({
       tx,
       userId,
       role,
       previousValue: accommodationBooking,
-      newValue: updatedBooking,
+      newValue: updateBooking,
       action: 'RESCHEDULED',
     });
 
-    return updatedBooking;
+    return {
+      booking: updateBooking,
+      pricing: {
+        oldPrice,
+        newTotalPrice,
+        priceDifference,
+        requireAdditionalPayment: priceDifference > 0,
+      },
+      payment: paymentTransaction
+        ? {
+            amount: priceDifference,
+
+            invoiceUrl: paymentTransaction.invoiceUrl,
+
+            paymentStatus: paymentTransaction.paymentStatus,
+          }
+        : null,
+    };
   });
 }

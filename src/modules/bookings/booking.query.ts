@@ -2,6 +2,7 @@ import z from 'zod';
 import { prisma } from '../../config/prisma';
 import {
   CancellationPolicy,
+  PaymentStatus,
   Prisma,
   Role,
 } from '../../generated/prisma/client';
@@ -25,8 +26,8 @@ export async function findBookingOrThrow({
   userId,
 }: {
   bookingId: string;
-  role: Role;
-  userId: string;
+  role?: Role;
+  userId?: string;
 }) {
   const booking = await prisma.booking.findUnique({
     where: {

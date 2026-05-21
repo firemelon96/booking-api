@@ -1,4 +1,5 @@
 import { prisma } from '../../../config/prisma';
+import { Prisma } from '../../../generated/prisma/client';
 import { Role } from '../../../generated/prisma/enums';
 
 export async function findAccommodationBookingOrThrow({
@@ -17,7 +18,9 @@ export async function findAccommodationBookingOrThrow({
     },
     include: {
       accommodation: true,
-      booking: true,
+      booking: {
+        include: { user: true },
+      },
       unit: true,
     },
   });
