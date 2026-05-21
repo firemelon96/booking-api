@@ -1,17 +1,13 @@
 import { prisma } from '../../../config/prisma';
-import {
-  BookingStatus,
-  PaymentStatus,
-  Role,
-} from '../../../generated/prisma/enums';
+import { Role } from '../../../generated/prisma/enums';
 import { logBookingAction } from '../../bookings/audit/booking-audit.service';
+import { createUniqueBookingReference } from '../../bookings/booking.query';
 import {
-  createUniqueBookingReference,
-  findBookingOrThrow,
-} from '../../bookings/booking.query';
-import { createRescheduleAdjustmentPayment } from '../../bookings/payment/payment.query';
+  createInitialBookingPayment,
+  createPaymentTransaction,
+  createRescheduleAdjustmentPayment,
+} from '../../bookings/payment/payment.query';
 import { logAdminWarning } from '../../logs/admin-warning.service';
-import { createXenditInvoice } from '../../webhooks/xendit/xendit.service';
 import { findAccommodationOrFail } from '../accommodation.query';
 import {
   lockAccommodationInventory,
@@ -75,6 +71,10 @@ export async function createAccommodationBookingService(
     const reference = await createUniqueBookingReference(tx);
 
     let selectedUnit;
+    let reservationResult = {
+      hasOverbooking: false,
+      adminOverride: false,
+    };
 
     if (unitId) {
       selectedUnit = await tx.accommodationUnit.findFirst({
@@ -96,7 +96,16 @@ export async function createAccommodationBookingService(
           throw new Error('Guest count exceeds unit limit');
         }
 
-        // await logAdminWarning({})
+        reservationResult.adminOverride = true;
+
+        await logAdminWarning({
+          tx,
+          actionType: 'EXCEED_CAPACITY',
+          message: `Admin exceeds maxguest limit on ${dates}`,
+          actorId: userId,
+          unitId: selectedUnit.id,
+          metadata: selectedUnit,
+        });
       }
 
       await ensureUnitInventoryRows(tx, {
@@ -110,20 +119,41 @@ export async function createAccommodationBookingService(
         dates,
       });
 
-      await reserveUnitInventory(tx, { unitId, dates, units, isAdmin });
+      reservationResult = await reserveUnitInventory(tx, {
+        unitId,
+        dates,
+        units,
+        isAdmin,
+        userId,
+      });
     } else {
       if (guests > (accommodation.maxGuests ?? 0)) {
-        throw new Error('Guest count exceeds accommodation limit');
+        if (!isAdmin) {
+          throw new Error('Guest count exceeds accommodation limit');
+        }
+
+        reservationResult.adminOverride = true;
+
+        await logAdminWarning({
+          tx,
+          actionType: 'EXCEED_CAPACITY',
+          actorId: userId,
+          accommodationId: accommodation.id,
+          message: `Admin exceeding limit accommodation on ${dates}`,
+          metadata: accommodation,
+        });
       }
 
       await ensureAccommodationInventoryRows(tx, { accommodationId, dates });
 
       await lockAccommodationInventory(tx, { accommodationId, dates });
 
-      await reserveAccommodationInventory(tx, {
+      reservationResult = await reserveAccommodationInventory(tx, {
         accommodationId,
         dates,
         units,
+        userId,
+        isAdmin,
       });
     }
 
@@ -141,6 +171,11 @@ export async function createAccommodationBookingService(
         userId,
         totalPrice,
         expiresAt,
+        isAdminOverride: reservationResult.adminOverride,
+        bookingStatus: isAdmin ? 'CONFIRMED' : 'PENDING',
+        paymentStatus: isAdmin ? 'PAID' : 'PENDING',
+        paidAmount: isAdmin ? totalPrice : 0,
+        remainingBalance: isAdmin ? 0 : totalPrice,
       },
     });
 
@@ -155,18 +190,49 @@ export async function createAccommodationBookingService(
         guests,
         units,
         specialRequests,
+        isOverbooked: reservationResult.hasOverbooking,
       },
     });
+
+    let paymentTransaction = null;
+
+    if (!isAdmin) {
+      paymentTransaction = await createInitialBookingPayment(tx, {
+        amount: totalPrice,
+        bookingId: booking.id,
+        type: 'INITIAL_PAYMENT',
+      });
+    } else {
+      paymentTransaction = await createPaymentTransaction({
+        tx,
+        type: 'MANUAL_ADJUSTMENT',
+        amount: totalPrice,
+        paymentStatus: 'PAID',
+        bookingId: booking.id,
+        description: 'Admin offline booking payment',
+      });
+    }
 
     await logBookingAction({
       tx,
       userId,
-      role: 'USER', //pass the role and allow overbooking for admin
+      role,
       newValue: booking,
       action: 'CREATED',
     });
 
-    return booking;
+    return {
+      booking,
+      payment: paymentTransaction
+        ? {
+            paymentStatus: paymentTransaction.paymentStatus,
+
+            invoiceUrl: paymentTransaction.invoiceUrl,
+
+            amount: paymentTransaction.amount,
+          }
+        : null,
+    };
   });
 }
 
@@ -229,6 +295,7 @@ export async function reschedAccommodationBooking(
         dates: newDates,
         units: accommodationBooking.units,
         isAdmin,
+        userId,
       });
     } else {
       await lockAccommodationInventory(tx, {
@@ -255,6 +322,8 @@ export async function reschedAccommodationBooking(
       await reserveAccommodationInventory(tx, {
         accommodationId,
         dates: newDates,
+        isAdmin,
+        userId,
         units: accommodationBooking.units,
       });
     }

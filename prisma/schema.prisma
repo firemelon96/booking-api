@@ -92,6 +92,7 @@ enum AdminAction {
   FORCED_PRIVATE
   BOOKED_ON_CLOSED_DATE
   FORCED_JOINER
+  EXCEED_CAPACITY
 }
 
 model AdminWarningLog{
@@ -101,6 +102,7 @@ model AdminWarningLog{
   message   String
 
   accommodationId String?
+  unitId   String?
   tourId    String?
   bookingId String?
 
@@ -679,6 +681,8 @@ model AccommodationBooking {
   units Int 
 
   specialRequests String?
+
+  isOverbooked Boolean @default(false)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt

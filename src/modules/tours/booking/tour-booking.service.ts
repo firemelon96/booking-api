@@ -27,6 +27,10 @@ import {
   TourReschedPayload,
 } from './tour-booking-types';
 import { BookingInputType } from '../../bookings/booking.type';
+import {
+  createInitialBookingPayment,
+  createPaymentTransaction,
+} from '../../bookings/payment/payment.query';
 
 export async function createTourBooking(
   tourId: string,
@@ -120,6 +124,25 @@ export async function createTourBooking(
       },
     });
 
+    let paymentTransaction = null;
+
+    if (role !== 'ADMIN') {
+      paymentTransaction = await createInitialBookingPayment(tx, {
+        amount: totalPrice,
+        bookingId: booking.id,
+        type: 'INITIAL_PAYMENT',
+      });
+    } else {
+      paymentTransaction = await createPaymentTransaction({
+        tx,
+        type: 'MANUAL_ADJUSTMENT',
+        amount: totalPrice,
+        paymentStatus: 'PAID',
+        bookingId: booking.id,
+        description: 'Admin offline booking payment',
+      });
+    }
+
     await logBookingAction({
       tx,
       userId,
@@ -128,7 +151,16 @@ export async function createTourBooking(
       action: 'CREATED',
     });
 
-    return { booking, hasConflict };
+    return {
+      booking,
+      payment: paymentTransaction
+        ? {
+            paymentStatus: paymentTransaction.paymentStatus,
+            invoiceUrl: paymentTransaction.invoiceUrl,
+            amount: paymentTransaction.amount,
+          }
+        : null,
+    };
   });
 }
 

@@ -9,8 +9,19 @@ export async function logAdminWarning({
   metadata,
   tourId,
   bookingId,
+  unitId,
+  accommodationId,
 }: AdminWarningType & { tx: Prisma.TransactionClient }) {
   return tx.adminWarningLog.create({
-    data: { actionType, actorId, message, metadata, tourId, bookingId },
+    data: {
+      actionType,
+      unitId,
+      accommodationId,
+      actorId,
+      message,
+      metadata,
+      tourId,
+      bookingId,
+    },
   });
 }
