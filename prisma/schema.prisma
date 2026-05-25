@@ -223,6 +223,7 @@ model TourScheduleOption {
   capacity Int?
 
   capacities TourDailyCapacity[]
+  tourBookings TourBooking[]
 
   createdAt DateTime @default(now())
 }
@@ -366,6 +367,10 @@ model Booking {
 
   accommodationBooking AccommodationBooking?
 
+  transferBooking TransferBooking?
+
+  rentalBooking RentalBooking?
+
   payment PaymentTransation[]
 
   auditLog  BookingAuditLog[]
@@ -391,7 +396,8 @@ model TourBooking {
 
   notes        String?
 
-  scheduleId String? 
+  scheduleId String?
+  schedule TourScheduleOption? @relation(fields: [scheduleId], references: [id]) 
   
   isOverbooked Boolean @default(false)
 
@@ -570,6 +576,8 @@ model Amenity {
 
   accommodations  AccommodationAmenity[]
 
+  rentals RentalAmenity[]
+
   units AccommodationUnitAmenity[]
 }
 
@@ -705,9 +713,286 @@ model AccommodationCancellationPolicy{
   updatedAt DateTime  @updatedAt
 }
 
+model Transfer {
+  id  String @id @default(uuid())
+  name  String
+  slug  String @unique
+
+  description String?
+  type TransferType
+
+  originId  String
+  origin TransferLocation @relation("TransferOrigin", fields: [originId], references: [id])
+  destinationId String
+  destination TransferLocation @relation("TransferDestination", fields: [destinationId], references: [id])
+
+  pricingMode TransferPricingMode
+  basePrice Decimal @db.Decimal(12,2)
+  maxPassengers Int
+  hasSchedule Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt  
+
+  schedules TransferSchedule[]
+
+  inventories TransferInventory[]
+
+  pricing TransferPricing[]
+
+  bookings TransferBooking[]
+}
+
+model TransferLocation {
+  id  String @id @default(uuid())
+
+  name  String
+
+  type TransferLocationType
+
+  address String?
+
+  latitude Decimal?
+  longitude Decimal?
+
+  createdAt DateTime @default(now())
+
+  originTransfers Transfer[] @relation("TransferOrigin")
+
+  destinationTransfers Transfer[] @relation("TransferDestination")
+}
+
+model TransferSchedule {
+  id  String @id @default(uuid())
+
+  transferId  String
+  transfer Transfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+  departureTime String
+
+  maxPassengers Int
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  inventories TransferInventory[]
+
+  transferBookings TransferBooking[]
+}
+
+model TransferInventory {
+  id  String @id @default(uuid())
+
+  transferId String
+  transfer Transfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+  scheduleId String?
+  schedule TransferSchedule? @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  date  DateTime
+
+  availableSeats  Int
+  bookedSeats Int @default(0)
+
+  isClosed Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@unique([transferId, scheduleId, date])
+}
+
+model TransferPricing {
+  id String @id @default(uuid())
+
+  transferId  String
+  transfer Transfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+  pricingType PricingType
+
+  price Decimal @db.Decimal(12,2)
+
+  minPassengers Int?
+  maxPassengers Int?
+
+  createdAt DateTime @default(now())
+}
+
+model TransferBooking {
+  id  String @default(uuid())
+
+  bookingId String @unique
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  transferId String
+  transfer Transfer @relation(fields: [transferId], references: [id])
+
+  scheduleId String?
+  schedule TransferSchedule? @relation(fields: [scheduleId], references: [id])
+
+  date  DateTime
+
+  passengers Int
+
+  pricingType PricingType
+
+  pickupLocation  String?
+  dropoffLocation String?
+
+  createdAt DateTime @default(now())
+}
+
+enum TransferType {
+  AIRPORT
+  VAN
+  BOAT
+  FERRY
+  PRIVATE_CAR
+}
+
+enum TransferPricingMode {
+  SHARED
+  PRIVATE
+  MIXED
+}
+
+enum TransferLocationType {
+  AIRPORT
+  PORT
+  TERMINAL
+  HOTEL
+  CUSTOM
+}
+
+model Rental {
+  id String @id @default(uuid())
+
+  name String
+  slug String @unique
+
+  description String?
+
+  type RentalType
+
+  pricingMode RentalPricingMode
+
+  quantity Int
+
+  maxGuests Int?
+
+  hasHourlyPricing Boolean @default(false)
+
+  hasDailyPricing Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pricing RentalPricing[]
+
+  inventories RentalInventory[]
+
+  bookings RentalBooking[]
+
+  amenities RentalAmenity[]
+}
+
+model RentalInventory {
+  id String @id @default(uuid())
+
+  rentalId String 
+  rental Rental @relation(fields: [rentalId], references: [id], onDelete: Cascade)
+
+  date DateTime
+
+  availableUnits Int
+
+  bookedUnits Int @default(0)
+
+  isClosed Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@unique([rentalId, date])
+}
+
+model RentalPricing {
+  id String @id @default(uuid())
+
+  rentalId String
+  rental Rental @relation(fields: [rentalId], references: [id], onDelete: Cascade)
+
+  pricingType RentalPricingType
+
+  price Decimal @db.Decimal(12,2)
+
+  createdAt DateTime @default(now())
+}
+
+model RentalBooking {
+  id String @id  @default(uuid())
+
+  bookingId String @unique
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete:  Cascade)
+
+  rentalId String
+  rental Rental @relation(fields: [rentalId], references: [id])
+
+  startDate DateTime
+  endDate DateTime
+
+  quantity Int
+  guests Int?
+
+  pricingType RentalPricingType
+
+  pickupLocation String?
+  returnLocation String?
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RentalAmenity {
+  rentalId String
+  amenityId String
+
+  rental Rental @relation(fields: [rentalId], references: [id], onDelete:  Cascade)
+
+  amenity Amenity @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+
+  @@id([rentalId, amenityId])
+}
+
+enum RentalType {
+  MORTORBIKE
+  SCOOTER
+  CAR
+  VAN
+  BICYCLE
+  KAYAK
+  CAMPING_GEAR
+  BOAT
+  OTHER
+}
+
+enum RentalPricingMode {
+  FIXED
+  FLEXIBLE
+}
+
+enum RentalPricingType {
+  HOURLY
+  DAILY
+  WEEKLY
+}
+
 enum BookingType {
   TOUR
   ACCOMMODATION
+  TRANSFER
+  RENTAL
 }
 
 enum AccommodationType {

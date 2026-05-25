@@ -1,13 +1,8 @@
-import { success } from 'zod';
 import { prisma } from '../../../config/prisma';
 import xendit from '../../../config/xendit';
-import {
-  BookingAction,
-  BookingStatus,
-  PaymentStatus,
-} from '../../../generated/prisma/enums';
+import { BookingAction, PaymentStatus } from '../../../generated/prisma/enums';
 import { logBookingAction } from '../../bookings/audit/booking-audit.service';
-import { updateBookingPaymentSummary } from '../../bookings/booking.query';
+import { updateBookingPaymentSummary } from '../../bookings/payment/payment.query';
 
 export async function xenditPayment(
   signature: string,

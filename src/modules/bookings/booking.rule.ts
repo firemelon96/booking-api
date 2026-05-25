@@ -68,8 +68,7 @@ export function validateRescheduleRules(
 ) {
   if (
     tourBooking.booking.bookingStatus === 'CANCELLED' ||
-    tourBooking.booking.bookingStatus === 'EXPIRED' ||
-    tourBooking.booking.paymentStatus === 'PAID'
+    tourBooking.booking.bookingStatus === 'EXPIRED'
   ) {
     throw new Error('Cannot reschedule this booking');
   }

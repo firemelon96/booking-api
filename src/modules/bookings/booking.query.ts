@@ -2,6 +2,7 @@ import z from 'zod';
 import { prisma } from '../../config/prisma';
 import {
   CancellationPolicy,
+  CancellationRefundType,
   PaymentStatus,
   Prisma,
   Role,
@@ -77,18 +78,22 @@ export async function findTourBookingOrThrow({
 
 export function calculateCancellationRefund({
   bookingDate,
-  tourStartDate,
+  startDate,
   totalPrice,
   policy,
 }: {
   bookingDate: Date;
-  tourStartDate: Date;
+  startDate: Date;
   totalPrice: number;
-  policy: CancellationPolicy;
-}) {
+  policy: any;
+}): {
+  refundType: CancellationRefundType;
+  refundAmount: number;
+  refundPercentage: number;
+} {
   const now = bookingDate;
 
-  const diffMs = tourStartDate.getTime() - now.getTime();
+  const diffMs = startDate.getTime() - now.getTime();
 
   const hoursBeforeTour = diffMs / (1000 * 60 * 60);
 

@@ -1,7 +1,12 @@
 import { prisma } from '../../../config/prisma';
-import { Role } from '../../../generated/prisma/enums';
+import { CancellationRefundType, Role } from '../../../generated/prisma/enums';
 import { logBookingAction } from '../../bookings/audit/booking-audit.service';
-import { createUniqueBookingReference } from '../../bookings/booking.query';
+import {
+  calculateCancellationRefund,
+  createUniqueBookingReference,
+} from '../../bookings/booking.query';
+import { BOOKING_RULES } from '../../bookings/booking.rule';
+import { BookingInputType } from '../../bookings/booking.type';
 import {
   createInitialBookingPayment,
   createPaymentTransaction,
@@ -70,6 +75,7 @@ export async function createAccommodationBookingService(
   return prisma.$transaction(async (tx) => {
     const reference = await createUniqueBookingReference(tx);
 
+    let title;
     let selectedUnit;
     let reservationResult = {
       hasOverbooking: false,
@@ -83,6 +89,8 @@ export async function createAccommodationBookingService(
           accommodationId,
         },
       });
+
+      title = selectedUnit?.name;
 
       if (!selectedUnit) {
         throw new Error('Unit not found');
@@ -131,6 +139,8 @@ export async function createAccommodationBookingService(
         if (!isAdmin) {
           throw new Error('Guest count exceeds accommodation limit');
         }
+
+        title = accommodation.name;
 
         reservationResult.adminOverride = true;
 
@@ -201,6 +211,7 @@ export async function createAccommodationBookingService(
         amount: totalPrice,
         bookingId: booking.id,
         type: 'INITIAL_PAYMENT',
+        description: title,
       });
     } else {
       paymentTransaction = await createPaymentTransaction({
@@ -255,8 +266,17 @@ export async function reschedAccommodationBooking(
   const accommodationId = accommodationBooking.accommodationId;
   const unitId = accommodationBooking.unitId;
 
-  if (booking.bookingStatus === 'CANCELLED') {
-    throw new Error('Cannot reschedule cancelled booking');
+  if (
+    booking.bookingStatus === 'CANCELLED' ||
+    booking.bookingStatus === 'EXPIRED'
+  ) {
+    throw new Error('Cannot reschedule this booking');
+  }
+
+  if (booking.rescheduleCount > BOOKING_RULES.MAX_RESCHEDULES) {
+    throw new Error(
+      `Cannot rechedule more than ${BOOKING_RULES.MAX_RESCHEDULES}`,
+    );
   }
 
   const oldDates = getStayDates({
@@ -413,5 +433,91 @@ export async function reschedAccommodationBooking(
           }
         : null,
     };
+  });
+}
+
+export async function cancelAccommodationBookingService({
+  bookingId,
+  userId,
+  role,
+}: BookingInputType) {
+  const accommodationBooking = await findAccommodationBookingOrThrow({
+    bookingId,
+    userId,
+    role,
+  });
+
+  const booking = accommodationBooking.booking;
+  const unitId = accommodationBooking.unitId;
+  const accommodationId = accommodationBooking.accommodationId;
+
+  if (
+    booking.bookingStatus === 'CANCELLED' ||
+    booking.bookingStatus === 'EXPIRED'
+  ) {
+    throw new Error('Cannot reschedule this booking');
+  }
+
+  const dates = getStayDates({
+    checkIn: accommodationBooking.checkIn,
+    checkOut: accommodationBooking.checkOut,
+  });
+
+  return prisma.$transaction(async (tx) => {
+    //fix this policy later
+
+    // const policy = await tx.accommodationCancellationPolicy.findUnique({
+    //   where: { accommodationId: accommodationBooking.accommodationId },
+    // });
+
+    // let refund = {
+    //   refundAmount: 0,
+    //   refundPercentage: 0,
+    //   refundType: CancellationRefundType.NONE,
+    // };
+
+    // if (policy) {
+    //   refund = calculateCancellationRefund({
+    //     bookingDate: accommodationBooking.createdAt,
+    //     startDate: accommodationBooking.checkIn,
+    //     totalPrice: Number(accommodationBooking.booking.totalPrice),
+    //     policy,
+    //   });
+    // }
+
+    if (unitId) {
+      releaseUnitInventory(tx, {
+        unitId,
+        dates,
+        units: accommodationBooking.units,
+      });
+    } else {
+      releaseAccommodationInventory(tx, {
+        accommodationId,
+        dates,
+        units: accommodationBooking.units,
+      });
+    }
+
+    const cancelled = await tx.booking.update({
+      where: { id: bookingId },
+      data: {
+        type: 'ACCOMMODATION',
+        bookingStatus: 'CANCELLED',
+        refundStatus: 'PENDING',
+        cancelledAt: new Date(),
+        isAdminOverride: role === 'ADMIN',
+      },
+    });
+
+    await logBookingAction({
+      tx,
+      userId,
+      role,
+      newValue: cancelled,
+      action: 'CANCELLED',
+    });
+
+    return cancelled;
   });
 }

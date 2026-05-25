@@ -12,10 +12,10 @@ import itineraryRoutes from '../tours/itinerary/itinerary.routes';
 import pricingRoutes from '../tours/pricing/pricing.routes';
 import imageRoutes from '../tours/images/image.routes';
 import capacityRoutes from './capacity/capacity.routes';
+import tourBookingRoutes from './booking/tour-booking.route';
 import availabilityRoutes from './availability/availability.routes';
 import calendarRoutes from './calendar/calendar.route';
 import likeRoutes from './like/like.route';
-import { userCreateBooking } from '../bookings/booking.controller';
 import cancellationPolicyRoutes from './cancellation-policy/cancellation.route';
 
 const router = Router();
@@ -28,7 +28,7 @@ router.post('/', authenticate, requireAdmin, addTour);
 router.patch('/:id', authenticate, requireAdmin, editBaseTour);
 router.delete('/:id', authenticate, requireAdmin, removeTour);
 
-router.post('/:tourId/booking', authenticate, userCreateBooking);
+router.use('/:tourId/booking', tourBookingRoutes);
 
 router.use('/:tourId/itinerary', itineraryRoutes);
 router.use('/:tourId/pricing', pricingRoutes);

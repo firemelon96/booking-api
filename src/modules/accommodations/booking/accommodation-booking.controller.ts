@@ -56,17 +56,15 @@ export async function createBookingController(
     throw new Error('Unauthorized');
   }
 
-  const userId = userIdSchema.safeParse(req.user.userId);
-  const accommodationId = accommodationIdParams.safeParse(
-    req.params.accommodationId,
-  );
+  const userId = userIdSchema.safeParse(req.user);
+  const accommodationId = accommodationIdParams.safeParse(req.params);
 
   if (!accommodationId.success) {
     throw new Error('Invalid accommodation');
   }
 
   if (!userId.success) {
-    throw new Error('Unauthorized');
+    throw new Error('Unauthorized userid');
   }
 
   const payload = createAccommodationBookingSchema.safeParse(req.body);

@@ -43,3 +43,7 @@ export const tourParamsSchema = z.object({
   type: z.enum(TourType).optional(),
   duration: z.number().optional(),
 });
+
+export const tourIdParams = z.object({
+  tourId: z.uuid(),
+});

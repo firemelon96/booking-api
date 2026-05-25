@@ -1,52 +1,42 @@
 import { eachDayOfInterval } from 'date-fns';
 import { prisma } from '../../config/prisma';
-import { CancellationRefundType, Role } from '../../generated/prisma/enums';
+import { Role } from '../../generated/prisma/enums';
 import { normalizeInterval } from '../../utils/helper';
-import { findTourOrFail } from '../tours/tour.query';
 import {
   BookingInputType,
   BookingQueryType,
   RescheduleBookingPayload,
 } from './booking.type';
-import {
-  validateBookingRules,
-  validateCancelRules,
-  validateRescheduleRules,
-} from './booking.rule';
-import { checkAvailability } from '../tours/availability/availability.query';
-import {
-  lockCapacityRows,
-  prepareCapacity,
-  releaseCapacity,
-  reserveCapacity,
-} from '../tours/capacity/capacity.query';
-import { calculate } from '../tours/pricing/pricing.query';
+import { releaseCapacity } from '../tours/capacity/capacity.query';
 import { logBookingAction } from './audit/booking-audit.service';
-import {
-  calculateCancellationRefund,
-  createUniqueBookingReference,
-  findBookingOrThrow,
-  findTourBookingOrThrow,
-} from './booking.query';
+import { findBookingOrThrow } from './booking.query';
 import {
   mapAccommodationBooking,
   mapTourBooking,
 } from './booking-response.mapped';
-import { reschedAccommodationBooking } from '../accommodations/booking/accommodation-booking.service';
-import { rescheduleTourBooking } from '../tours/booking/tour-booking.service';
+import {
+  cancelAccommodationBookingService,
+  reschedAccommodationBooking,
+} from '../accommodations/booking/accommodation-booking.service';
+import {
+  cancelTourbooking,
+  rescheduleTourBooking,
+} from '../tours/booking/tour-booking.service';
 
-export async function getAllBookings({
-  userId,
-  role,
-  startDate,
-  endDate,
-  page = 1,
-  limit = 10,
-  search,
-  sort = 'createdAt:desc',
-  status,
-  tourId,
-}: BookingQueryType) {
+export async function getAllBookingsService(
+  userId: string,
+  role: Role,
+  {
+    page = 1,
+    limit = 10,
+    search,
+    sort = 'createdAt:desc',
+    bookingStatus,
+    paymentStatus,
+    reference,
+    type,
+  }: BookingQueryType,
+) {
   const safePage = Math.max(1, page);
   const safeLimit = Math.min(50, limit);
   const skip = (safePage - 1) * safeLimit;
@@ -61,43 +51,23 @@ export async function getAllBookings({
 
   if (role === 'USER') {
     where.userId = userId;
-
-    if (search) {
-      where.OR = [
-        {
-          tour: {
-            name: { contains: search, mode: 'insensitive' },
-          },
-        },
-        {
-          tour: {
-            description: { contains: search, mode: 'insensitive' },
-          },
-        },
-      ];
-    }
   }
 
-  if (tourId) where.tourId = tourId;
-  if (status) where.status = status;
-
-  if (startDate || endDate) {
-    where.startDate = {};
-    if (startDate) where.startDate.gte = startDate;
-    if (endDate) where.endDate.lte = endDate;
-  }
+  if (bookingStatus) where.bookingStatus = bookingStatus;
+  if (paymentStatus) where.paymentStatus = paymentStatus;
+  if (reference) where.reference = reference;
+  if (type) where.type = type;
 
   if (search) {
     where.OR = [
       {
-        user: {
-          email: { contains: search, mode: 'insensitive' },
-        },
+        paidAmount: { contains: search, mode: 'insensitive' },
       },
       {
-        tour: {
-          name: { contains: search, mode: 'insensitive' },
-        },
+        remainingBalance: { contains: search, mode: 'insensitive' },
+      },
+      {
+        type: { contains: search, mode: 'insensitive' },
       },
     ];
   }
@@ -208,73 +178,18 @@ export async function cancelbooked({
   userId,
   role,
 }: BookingInputType) {
-  const tourBooking = await findTourBookingOrThrow({
-    bookingId,
-    userId,
-    role,
-  });
+  const booking = await findBookingOrThrow({ bookingId, userId, role });
 
-  validateCancelRules({
-    existingBooking: tourBooking.booking,
-    tourBooking,
-  });
+  switch (booking.type) {
+    case 'ACCOMMODATION':
+      return cancelAccommodationBookingService({ bookingId, userId, role });
 
-  const interval = normalizeInterval(
-    tourBooking.startDate,
-    tourBooking.endDate,
-  );
+    case 'TOUR':
+      return cancelTourbooking({ bookingId, userId, role });
 
-  const dates = eachDayOfInterval(interval);
-
-  return prisma.$transaction(async (tx) => {
-    const policy = await tx.cancellationPolicy.findUnique({
-      where: { tourId: tourBooking.tourId },
-    });
-
-    if (!policy) {
-      throw new Error('Policy not found');
-    }
-
-    const { refundAmount, refundPercentage, refundType } =
-      calculateCancellationRefund({
-        bookingDate: tourBooking.createdAt,
-        tourStartDate: interval.start,
-        totalPrice: Number(tourBooking.booking.totalPrice),
-        policy,
-      });
-
-    await releaseCapacity({
-      tx,
-      dates,
-      participants: tourBooking.participants,
-      tourId: tourBooking.tourId,
-      scheduleId: tourBooking.scheduleId,
-    });
-
-    const cancelled = await tx.booking.update({
-      where: { id: bookingId },
-      data: {
-        type: 'TOUR',
-        bookingStatus: 'CANCELLED',
-        refundAmount,
-        refundStatus: 'PENDING',
-        canceledAt: new Date(),
-        cancellationRefundType: refundType as CancellationRefundType,
-        cancellationRefundPercentage: refundPercentage,
-        isAdminOverride: role === 'ADMIN',
-      },
-    });
-
-    await logBookingAction({
-      tx,
-      userId,
-      role,
-      newValue: cancelled,
-      action: 'CANCELLED',
-    });
-
-    return cancelled;
-  });
+    default:
+      throw new Error('Invalid booking type');
+  }
 }
 
 export async function detailedBooking({
@@ -294,20 +209,6 @@ export async function detailedBooking({
     default:
       throw new Error('Invalid type');
   }
-
-  // return {
-  //   tourName: tourBooking.tour.name,
-  //   location: tourBooking.tour.location,
-  //   tourType: tourBooking.tour.type,
-  //   duration: tourBooking.tour.durationDays,
-  //   participants: tourBooking.participants,
-  //   totalPrice: tourBooking.booking.totalPrice,
-  //   status: tourBooking.booking.bookingStatus,
-  //   startDate: tourBooking.startDate,
-  //   endDate: tourBooking.endDate,
-  //   scheduleId: tourBooking.scheduleId,
-  //   pricingType: tourBooking.pricingType,
-  // };
 }
 
 export async function expiredBooking(bookingId: string) {

@@ -26,7 +26,7 @@ router.get('/', authenticate, listAllBookings);
 router.patch('/:bookingId/reschedule', authenticate, reschedBooking);
 router.patch('/:bookingId/cancel', authenticate, cancelBooking);
 router.get('/:bookingId', authenticate, bookingDetail);
-router.post('/:bookingId/payment', authenticate, createPayment);
+// router.post('/:bookingId/payment', authenticate, createPayment);
 router.get('/reference', authenticate, referenceBooking);
 // router.post('/:bookingId/payment', authenticate, createAccommodationPayment);
 

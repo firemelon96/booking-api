@@ -8,7 +8,7 @@ import {
 import {
   cancelbooked,
   detailedBooking,
-  getAllBookings,
+  getAllBookingsService,
   getBookingByReference,
   rescheduleBooking,
 } from './booking.service';
@@ -24,20 +24,18 @@ export async function listAllBookings(
     throw new Error('Unauthorized');
   }
 
-  const input = {
-    userId: req.user.userId,
-    role: req.user.role,
-    ...req.query,
-  };
-
-  const payload = bookingQuerySchema.safeParse(input);
+  const payload = bookingQuerySchema.safeParse(req.query);
 
   if (!payload.success) {
     throw new Error('Invalid fields');
   }
 
   try {
-    const results = await getAllBookings(payload.data);
+    const results = await getAllBookingsService(
+      req.user.userId,
+      req.user.role,
+      payload.data,
+    );
 
     res.json(results);
   } catch (error) {
@@ -45,7 +43,6 @@ export async function listAllBookings(
   }
 }
 
-//this should create for both the tour and accommodation
 export async function adminCreateBooking(
   req: Request,
   res: Response,
@@ -53,10 +50,6 @@ export async function adminCreateBooking(
 ) {
   if (!req.user) {
     throw new Error('Unauthorized');
-  }
-
-  if (Array.isArray(req.params.tourId)) {
-    throw new Error('Invalid params');
   }
 
   const { tourId, ...rest } = req.body;
@@ -75,39 +68,6 @@ export async function adminCreateBooking(
   try {
     const booking = await createTourBooking(
       tourId,
-      req.user.userId,
-      req.user.role,
-      payload.data,
-    );
-
-    res.json(booking);
-  } catch (error) {
-    next(error);
-  }
-}
-
-export async function userCreateBooking(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) {
-  if (!req.user) {
-    throw new Error('Unauthorized');
-  }
-
-  if (Array.isArray(req.params.tourId)) {
-    throw new Error('Invalid params');
-  }
-
-  const payload = createTourBookingSchema.safeParse(req.body);
-
-  if (!payload.success) {
-    throw new Error('Invalid fields');
-  }
-
-  try {
-    const booking = await createTourBooking(
-      req.params.tourId,
       req.user.userId,
       req.user.role,
       payload.data,

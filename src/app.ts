@@ -12,6 +12,7 @@ import webhookRoutes from './modules/webhooks/xendit/xendit.route';
 import userRoutes from './modules/users/user.route';
 import amenityRoutes from './modules/amenity/amenity.route';
 import accommodationRoutes from './modules/accommodations/accommodation.route';
+import transferRoutes from './modules/transfers/transfer.route';
 
 import cookieParser from 'cookie-parser';
 import { errorHandler } from './middlewares/error.middleware';
@@ -43,6 +44,8 @@ app.use('/api/webhook', webhookRoutes);
 app.use('/api/amenity', amenityRoutes);
 
 app.use('/api/accommodations', accommodationRoutes);
+
+app.use('/api/transfers', transferRoutes);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));

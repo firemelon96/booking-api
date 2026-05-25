@@ -300,7 +300,7 @@ export async function cancelTourbooking({
     const { refundAmount, refundPercentage, refundType } =
       calculateCancellationRefund({
         bookingDate: tourBooking.createdAt,
-        tourStartDate: interval.start,
+        startDate: interval.start,
         totalPrice: Number(tourBooking.booking.totalPrice),
         policy,
       });

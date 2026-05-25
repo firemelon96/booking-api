@@ -103,6 +103,8 @@ export async function removeUnit(
 
   try {
     await deleteUnit(accommodationId, unitId);
+
+    res.json({ success: true });
   } catch (error) {
     next(error);
   }
