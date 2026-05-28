@@ -3,13 +3,23 @@ import { authenticate } from '../../middlewares/auth.middleware';
 import { requireAdmin } from '../../middlewares/role.middleware';
 import {
   createTransferController,
+  getAllTransferController,
+  getTransferBySlugController,
   removeTransferController,
   updateTransferController,
 } from './transfer.controller';
 
+import transferBookingRoute from './bookings/bookinng.route';
+import pricingRoute from './pricings/pricing.route';
+import scheduleRoute from './schedules/schedule.route';
+
 const router = Router({ mergeParams: true });
 
+router.get('/', getAllTransferController);
+router.get('/:slug', getTransferBySlugController);
+
 router.post('/', authenticate, requireAdmin, createTransferController);
+
 router.patch(
   '/:transferId',
   authenticate,
@@ -22,5 +32,10 @@ router.delete(
   requireAdmin,
   removeTransferController,
 );
+
+router.post('/:transferId/booking', transferBookingRoute);
+
+router.use('/:transferId', pricingRoute);
+router.use('/:transferId', scheduleRoute);
 
 export default router;

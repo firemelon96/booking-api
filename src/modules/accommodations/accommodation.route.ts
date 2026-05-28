@@ -15,7 +15,7 @@ import bookingRoutes from './booking/accommodation-booking.route';
 
 const router = Router();
 
-router.get('/', authenticate, getAccommodations);
+router.get('/', getAccommodations);
 
 router.post('/', authenticate, requireAdmin, createAccommodation);
 router.patch(

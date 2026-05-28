@@ -10,4 +10,6 @@ export const adminWarningSchema = z.object({
   metadata: z.any(),
   accommodationId: z.uuid().optional(),
   unitId: z.uuid().optional(),
+  rentalId: z.uuid().optional(),
+  transferId: z.uuid().optional(),
 });

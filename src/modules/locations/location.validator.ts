@@ -1,8 +1,9 @@
 import z from 'zod';
+import { TransferLocationType } from '../../generated/prisma/enums';
 
 export const addLocationSchema = z.object({
   name: z.string(),
-  type: z.enum(['AIRPORT', 'PORT', 'TERMINAL']),
+  type: z.enum(TransferLocationType),
   address: z.string().optional(),
   latitude: z.number().optional(),
   longitude: z.number().optional(),

@@ -134,8 +134,6 @@ export async function createFullTour(data: CreateTourType) {
         location: data.location,
         name: data.name,
         durationDays: data.durationDays,
-        exclusions: data.exclusions,
-        inclusions: data.inclusions,
         capacityMode: data.capacityMode,
         type: data.type,
         joinerCapacity: data.joinerCapacity,

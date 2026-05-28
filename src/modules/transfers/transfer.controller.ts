@@ -1,16 +1,68 @@
 import { NextFunction, Request, Response } from 'express';
-import { createTransferSchema, transferIdParams } from './transfer.validator';
+import {
+  createTransferSchema,
+  transferIdParams,
+  transferQuerySchema,
+  transferSlugParams,
+  updateBaseTransferSchema,
+} from './transfer.validator';
 import {
   createdTransferService,
+  getAllTransferService,
+  getTransferBySlugService,
   removedTransferService,
   updatedTransferService,
 } from './transfer.service';
+
+export async function getAllTransferController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  const payload = transferQuerySchema.safeParse(req.query);
+
+  if (!payload.success) {
+    throw new Error('Invalid fields');
+  }
+
+  try {
+    const transfersList = await getAllTransferService(payload.data);
+
+    res.json(transfersList);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getTransferBySlugController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  const params = transferSlugParams.safeParse(req.params);
+
+  if (!params.success) {
+    throw new Error('Invalid params');
+  }
+
+  try {
+    const detailedTransfer = await getTransferBySlugService(params.data.slug);
+
+    res.json(detailedTransfer);
+  } catch (error) {
+    next(error);
+  }
+}
 
 export async function createTransferController(
   req: Request,
   res: Response,
   next: NextFunction,
 ) {
+  if (!req.user) {
+    throw new Error('Unauthorized');
+  }
+
   const payload = createTransferSchema.safeParse(req.body);
 
   if (!payload.success) {
@@ -18,7 +70,7 @@ export async function createTransferController(
   }
 
   try {
-    const created = await createdTransferService(payload.data);
+    const created = await createdTransferService(req.user.userId, payload.data);
 
     res.status(201).json(created);
   } catch (error) {
@@ -31,14 +83,25 @@ export async function updateTransferController(
   res: Response,
   next: NextFunction,
 ) {
-  const payload = transferIdParams.safeParse(req.params);
+  const { transferId } = req.params;
+
+  const params = transferIdParams.safeParse(transferId);
+
+  if (!params.success) {
+    throw new Error('Invalid params');
+  }
+
+  const payload = updateBaseTransferSchema.safeParse(req.params);
 
   if (!payload.success) {
     throw new Error('Invalid fields');
   }
 
   try {
-    const created = await updatedTransferService(payload.data.transferId);
+    const created = await updatedTransferService(
+      params.data.transferId,
+      payload.data,
+    );
 
     res.status(201).json(created);
   } catch (error) {

@@ -65,13 +65,11 @@ export async function createTourBooking(
 
     await checkAvailability({ tx, tourId, dates, role, userId });
 
-    if (role === 'USER') {
-      await lockCapacityRows(tx, {
-        tourId,
-        dates,
-        scheduleKey: scheduleId ?? 'NO_SCHEDULE',
-      });
-    }
+    await lockCapacityRows(tx, {
+      tourId,
+      dates,
+      scheduleKey: scheduleId ?? 'NO_SCHEDULE',
+    });
 
     const capacityContext = await prepareCapacity({
       tx,
@@ -81,7 +79,7 @@ export async function createTourBooking(
       dates,
     });
 
-    const { hasOverbooking, hasConflict } = await reserveCapacity({
+    const { hasOverbooking } = await reserveCapacity({
       tx,
       capacityMode: tour.capacityMode,
       dates,

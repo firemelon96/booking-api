@@ -6,10 +6,6 @@ import {
   Role,
   TourSchedule,
 } from '../src/generated/prisma/enums';
-import { seedExclusive } from './exclusive';
-import { seedShared } from './shared';
-import { seedMixed } from './mixed';
-import { seedMixedDayTour } from './mixed-day';
 
 async function main() {
   console.log('🌱 Seeding database...');

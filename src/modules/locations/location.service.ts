@@ -1,4 +1,5 @@
 import { prisma } from '../../config/prisma';
+import { findLocationOrFail } from './location.query';
 import {
   AddLocationInput,
   LocationQueryInput,
@@ -6,20 +7,39 @@ import {
 } from './location.type';
 
 export async function addLocationService(data: AddLocationInput) {
-  //check
-  //return creation of location
+  const exist = await prisma.transferLocation.findFirst({
+    where: { name: data.name },
+  });
+
+  if (exist) {
+    throw new Error('Location already exist');
+  }
+
+  return prisma.transferLocation.create({
+    data,
+  });
 }
 
 export async function updateLocationService(
-  transferId: string,
+  locationId: string,
   data: UpdateLocationInput,
 ) {
-  //check
-  //return creation of location
+  const location = await findLocationOrFail(locationId);
+
+  return prisma.transferLocation.update({
+    where: {
+      id: location.id,
+    },
+    data: {
+      ...data,
+    },
+  });
 }
 
 export async function removeLocationService(locationId: string) {
-  //remove using the id
+  await findLocationOrFail(locationId);
+
+  return prisma.transferLocation.delete({ where: { id: locationId } });
 }
 
 export async function listLocationService({
@@ -60,46 +80,28 @@ export async function listLocationService({
     ];
   }
 
-  //    const [data, total] = await prisma.$transaction([
-  //     prisma.location.findMany({
-  //       where,
-  //       skip,
-  //       take: safeLimit,
-  //       orderBy,
-  //       include: {
-  //         _count: {
-  //           select: {
-  //             likes: true,
-  //           },
-  //         },
-  //         pricing: {
-  //           select: {
-  //             price: true,
-  //             pricingModel: true,
-  //           },
-  //         },
-  //       },
-  //     }),
-  //     prisma.location.count({ where }),
-  //   ]);
+  const [data, total] = await prisma.$transaction([
+    prisma.transferLocation.findMany({
+      where,
+      skip,
+      take: safeLimit,
+      orderBy,
+    }),
+    prisma.transferLocation.count({ where }),
+  ]);
 
-  //   return {
-  //     data: data.map((t) => ({
-  //       id: t.id,
-  //       tourName: t.name,
-  //       slug: t.slug,
-  //       location: t.location,
-  //       duration: t.durationDays,
-  //       mode: t.capacityMode,
-  //       tourType: t.type,
-  //       startsAt: `${t.pricing[0].price} ${t.pricing[0].pricingModel}`,
-  //       numberOfLikes: t._count,
-  //     })),
-  //     meta: {
-  //       total,
-  //       page: safePage,
-  //       pageSize: safeLimit,
-  //       pageCount: Math.ceil(total / safeLimit),
-  //     },
-  //   };
+  return {
+    data: data.map((l) => ({
+      id: l.id,
+      name: l.name,
+      type: l.type,
+      address: l.address,
+    })),
+    meta: {
+      total,
+      page: safePage,
+      pageSize: safeLimit,
+      pageCount: Math.ceil(total / safeLimit),
+    },
+  };
 }
