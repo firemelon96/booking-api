@@ -86,5 +86,3 @@ export async function createBookingController(
     next(error);
   }
 }
-
-export async function reschedBookingController() {}

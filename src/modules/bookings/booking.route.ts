@@ -3,18 +3,17 @@ import { authenticate } from '../../middlewares/auth.middleware';
 import { requireAdmin } from '../../middlewares/role.middleware';
 import {
   listAllBookings,
-  adminCreateBooking,
   reschedBooking,
   cancelBooking,
   bookingDetail,
   referenceBooking,
 } from './booking.controller';
-import { createPayment } from './payment/payment.controller';
 import { adminCreateAccommodationBooking } from '../accommodations/booking/accommodation-booking.controller';
+import { adminCreateTourBooking } from '../tours/booking/tour-booking.controller';
 
 const router = Router({ mergeParams: true });
 
-router.post('/tours', authenticate, requireAdmin, adminCreateBooking);
+router.post('/tours', authenticate, requireAdmin, adminCreateTourBooking);
 router.post(
   '/accommodations',
   authenticate,

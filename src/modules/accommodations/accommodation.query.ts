@@ -17,6 +17,11 @@ export async function findAccommodationBySlug(slug: string) {
     where: {
       slug,
     },
+    include: {
+      amenities: true,
+      images: true,
+      units: true,
+    },
   });
 
   if (!accom) {

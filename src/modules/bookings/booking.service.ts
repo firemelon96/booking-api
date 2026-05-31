@@ -13,6 +13,7 @@ import { findBookingOrThrow } from './booking.query';
 import {
   mapAccommodationBooking,
   mapTourBooking,
+  mapTransferBooking,
 } from './booking-response.mapped';
 import {
   cancelAccommodationBookingService,
@@ -22,6 +23,10 @@ import {
   cancelTourbooking,
   rescheduleTourBooking,
 } from '../tours/booking/tour-booking.service';
+import {
+  cancelTransferBooking,
+  rescheduleTransferBooking,
+} from '../transfers/bookings/booking.service';
 
 export async function getAllBookingsService(
   userId: string,
@@ -168,6 +173,12 @@ export async function rescheduleBooking(
         scheduleId: payload.scheduleId,
       });
 
+    case 'TRANSFER':
+      return rescheduleTransferBooking(bookingId, userId, role, {
+        travelDate: payload.travelDate!,
+        scheduleId: payload.scheduleId,
+      });
+
     default:
       throw new Error('Invalid booking type');
   }
@@ -187,6 +198,9 @@ export async function cancelbooked({
     case 'TOUR':
       return cancelTourbooking({ bookingId, userId, role });
 
+    case 'TRANSFER':
+      return cancelTransferBooking({ bookingId, userId, role });
+
     default:
       throw new Error('Invalid booking type');
   }
@@ -205,6 +219,9 @@ export async function detailedBooking({
 
     case 'ACCOMMODATION':
       return mapAccommodationBooking(booking);
+
+    case 'TRANSFER':
+      return mapTransferBooking(booking);
 
     default:
       throw new Error('Invalid type');

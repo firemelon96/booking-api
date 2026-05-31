@@ -1,6 +1,9 @@
 import { prisma } from '../../config/prisma';
 import { slugify } from '../../utils/slugify';
-import { findAccommodationOrFail } from './accommodation.query';
+import {
+  findAccommodationBySlug,
+  findAccommodationOrFail,
+} from './accommodation.query';
 import {
   AccommodationQueryInput,
   CreateAccommodationInput,
@@ -46,6 +49,12 @@ export async function createdAccommodation(
 
     return accommodation;
   });
+}
+
+export async function getAccommodationDetailService(slug: string) {
+  const accommodation = await findAccommodationBySlug(slug);
+
+  return accommodation;
 }
 
 export async function listAccommodation({
@@ -106,6 +115,7 @@ export async function listAccommodation({
     data: data.map((a) => ({
       id: a.id,
       accommodationName: a.name,
+      slug: a.slug,
       description: a.description,
       type: a.type,
       address: a.address,

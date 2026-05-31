@@ -43,42 +43,6 @@ export async function listAllBookings(
   }
 }
 
-export async function adminCreateBooking(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) {
-  if (!req.user) {
-    throw new Error('Unauthorized');
-  }
-
-  const { tourId, ...rest } = req.body;
-
-  if (!tourId) {
-    throw new Error('Tour id must be provided');
-  }
-
-  //should accept both tour and accoms
-  const payload = createTourBookingSchema.safeParse(rest);
-
-  if (!payload.success) {
-    throw new Error('Invalid fields');
-  }
-
-  try {
-    const booking = await createTourBooking(
-      tourId,
-      req.user.userId,
-      req.user.role,
-      payload.data,
-    );
-
-    res.json(booking);
-  } catch (error) {
-    next(error);
-  }
-}
-
 export async function reschedBooking(
   req: Request,
   res: Response,

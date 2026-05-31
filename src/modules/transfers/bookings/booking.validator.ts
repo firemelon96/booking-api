@@ -9,3 +9,8 @@ export const createTransferBookingSchema = z.object({
   pickupLocation: z.string().optional(),
   dropoffLocation: z.string().optional(),
 });
+
+export const rescheduleTransferBookingSchema = z.object({
+  travelDate: z.coerce.date(),
+  scheduleId: z.string().optional(),
+});

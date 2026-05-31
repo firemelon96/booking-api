@@ -1,7 +1,6 @@
 import { startOfDay } from 'date-fns';
 import { PricingType, Prisma } from '../../../generated/prisma/client';
 import { logAdminWarning } from '../../logs/admin-warning.service';
-import { TransferInventoryInput } from './inventory.type';
 
 export async function ensureTransferInventory(
   tx: Prisma.TransactionClient,
@@ -240,7 +239,7 @@ export async function reserveTransferInventory(
 ) {
   switch (pricingType) {
     case 'JOINER':
-      await reserveSharedTransferInventory(tx, {
+      return reserveSharedTransferInventory(tx, {
         transferId,
         scheduleId,
         travelDate,
@@ -250,7 +249,7 @@ export async function reserveTransferInventory(
       });
 
     case 'PRIVATE':
-      await reservePrivateTransferInventory(tx, {
+      return reservePrivateTransferInventory(tx, {
         transferId,
         scheduleId,
         travelDate,
@@ -261,4 +260,55 @@ export async function reserveTransferInventory(
     default:
       throw new Error('Invalid pricing type');
   }
+}
+
+export async function releaseTransferInventory(
+  tx: Prisma.TransactionClient,
+  {
+    transferId,
+    scheduleId,
+    travelDate,
+    passengers,
+    pricingType,
+  }: {
+    transferId: string;
+    scheduleId?: string | null;
+    travelDate: Date;
+    passengers: number;
+    pricingType: PricingType;
+  },
+) {
+  const inventory = await tx.transferInventory.findFirst({
+    where: {
+      transferId,
+      scheduleId: scheduleId ?? null,
+      date: startOfDay(travelDate),
+    },
+  });
+
+  if (!inventory) {
+    return;
+  }
+
+  if (pricingType === 'PRIVATE') {
+    await tx.transferInventory.update({
+      where: {
+        id: transferId,
+      },
+      data: {
+        bookedSeats: 0,
+      },
+    });
+
+    return;
+  }
+
+  await tx.transferInventory.update({
+    where: { id: transferId },
+    data: {
+      bookedSeats: {
+        decrement: passengers,
+      },
+    },
+  });
 }

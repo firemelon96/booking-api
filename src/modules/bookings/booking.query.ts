@@ -45,6 +45,9 @@ export async function findBookingOrThrow({
           unit: true,
         },
       },
+      transferBooking: {
+        select: { transfer: true },
+      },
     },
   });
 

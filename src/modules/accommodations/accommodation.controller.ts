@@ -1,15 +1,37 @@
 import { NextFunction, Request, Response } from 'express';
 import {
   accommodationQuerySchema,
+  accommodationSlugParams,
   createAccommodationSchema,
   updateAccommodationSchema,
 } from './accommodation.validator';
 import {
   createdAccommodation,
+  getAccommodationDetailService,
   listAccommodation,
   removedAccommodation,
   updatedAccommodation,
 } from './accommodation.service';
+
+export async function getAccommodationDetailController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  const params = accommodationSlugParams.safeParse(req.params);
+
+  if (!params.success) {
+    throw new Error('Invalid slug');
+  }
+
+  try {
+    const detail = await getAccommodationDetailService(params.data.slug);
+
+    res.json(detail);
+  } catch (error) {
+    next(error);
+  }
+}
 
 export async function createAccommodation(
   req: Request,

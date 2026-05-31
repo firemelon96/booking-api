@@ -34,7 +34,7 @@ model User {
   bookings Booking[]
   reviews  Review[]
 
-  likedTours  TourLike[]
+  likedService  ServiceLike[]
 
   accommodations  Accommodation[]
   tours Tour[]
@@ -151,7 +151,7 @@ model Tour {
   
   tourBookings       TourBooking[]
 
-  likes              TourLike[]
+  likes              ServiceLike[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -191,18 +191,27 @@ model TourExclusion {
   @@index([tourId])
 }
 
-model TourLike {
+model  ServiceLike {
   id  String @id @default(uuid())
 
+  serviceType BookingType
+
   userId  String
-  tourId  String
 
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tour  Tour  @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
+  tourId  String?
+  tour  Tour?  @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
+  transferId String?
+  transfer Transfer? @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+  accommodationId String?
+  accommodation Accommodation? @relation(fields: [accommodationId], references: [id], onDelete: Cascade)
 
   createdAt   DateTime @default(now())
 
-  @@unique([userId, tourId])
+  @@unique([userId, serviceType])
 }
 
 //================================
@@ -566,6 +575,8 @@ model Accommodation {
 
   inventory AccommodationInventory[]
 
+  likes ServiceLike[]
+
   cancellationPolicy  AccommodationCancellationPolicy?
 
   createdAt DateTime @default(now())
@@ -765,6 +776,8 @@ model Transfer {
   description String?
   type TransferType
 
+  pricingMode TransferPricingMode
+
   originId  String
   origin TransferLocation @relation("TransferOrigin", fields: [originId], references: [id])
   destinationId String
@@ -789,6 +802,8 @@ model Transfer {
   amenities TransferAmenity[]
 
   bookings TransferBooking[]
+
+  likes ServiceLike[]
 
   images Image[]
 }
@@ -908,6 +923,11 @@ enum TransferType {
   BOAT
   FERRY
   PRIVATE_CAR
+}
+
+enum TransferPricingMode {
+  SHARED
+  EXCLUSIVE
 }
 
 enum TransferLocationType {

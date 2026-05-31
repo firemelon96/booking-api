@@ -34,3 +34,7 @@ export const accommodationQuerySchema = z.object({
   search: z.string().optional(),
   accommodationType: z.enum(AccommodationType).optional(),
 });
+
+export const accommodationSlugParams = z.object({
+  slug: z.string(),
+});

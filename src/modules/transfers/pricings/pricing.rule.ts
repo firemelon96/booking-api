@@ -12,18 +12,12 @@ export function validateTransferPricing(
 
   const pricingSet = new Set(pricing.map((p) => p.pricingType));
 
-  if (mode === 'PRIVATE' && pricingSet.has('JOINER')) {
+  if (mode === 'EXCLUSIVE' && pricingSet.has('JOINER')) {
     throw new Error('Joiner pricing is not valid');
   }
 
   if (mode === 'SHARED' && pricingSet.has('PRIVATE')) {
     throw new Error('Private pricing is not valid');
-  }
-
-  if (mode === 'MIXED') {
-    if (!pricingSet.has('JOINER') || !pricingSet.has('PRIVATE')) {
-      throw new Error('Must include both joiner and private price');
-    }
   }
 
   const grouped = groupBy(pricing, 'pricingType');

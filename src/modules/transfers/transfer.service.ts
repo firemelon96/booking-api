@@ -88,12 +88,6 @@ export async function getAllTransferService({
             name: true,
           },
         },
-        images: {
-          select: {
-            url: true,
-            type: true,
-          },
-        },
         amenities: {
           include: {
             amenity: {
@@ -101,6 +95,12 @@ export async function getAllTransferService({
                 name: true,
               },
             },
+          },
+        },
+        schedules: {
+          select: {
+            departureTime: true,
+            maxPassengers: true,
           },
         },
       },
@@ -112,13 +112,17 @@ export async function getAllTransferService({
     data: data.map((t) => ({
       id: t.id,
       transferName: t.name,
+      slug: t.slug,
       type: t.type,
       origin: t.origin.name,
       destination: t.destination.name,
       maxPassengers: t.maxPassengers,
       hasSchedule: t.hasSchedule,
-      amenities: t.amenities ?? [],
-      image: t.images[0].url,
+      amenities: t.amenities.map((a) => a.amenity.name),
+      schedules: t.schedules.map((s) => ({
+        departureTime: s.departureTime,
+        maxPassengers: s.maxPassengers,
+      })),
     })),
     meta: {
       total,

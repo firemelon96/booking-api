@@ -30,6 +30,8 @@ export const reschedulBookingSchema = z.object({
   endDate: z.coerce.date().optional(),
   scheduleId: z.string().optional(),
 
+  travelDate: z.coerce.date().optional(),
+
   checkIn: z.coerce.date().optional(),
   checkOut: z.coerce.date().optional(),
   reason: z.string().optional(),

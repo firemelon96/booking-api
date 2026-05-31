@@ -85,25 +85,20 @@ export async function updateTransferController(
 ) {
   const { transferId } = req.params;
 
-  const params = transferIdParams.safeParse(transferId);
-
-  if (!params.success) {
+  if (Array.isArray(transferId)) {
     throw new Error('Invalid params');
   }
 
-  const payload = updateBaseTransferSchema.safeParse(req.params);
+  const payload = updateBaseTransferSchema.safeParse(req.body);
 
   if (!payload.success) {
     throw new Error('Invalid fields');
   }
 
   try {
-    const created = await updatedTransferService(
-      params.data.transferId,
-      payload.data,
-    );
+    const created = await updatedTransferService(transferId, payload.data);
 
-    res.status(201).json(created);
+    res.json(created);
   } catch (error) {
     next(error);
   }
@@ -121,9 +116,9 @@ export async function removeTransferController(
   }
 
   try {
-    const created = await removedTransferService(payload.data.transferId);
+    await removedTransferService(payload.data.transferId);
 
-    res.status(201).json(created);
+    res.json({ success: true, message: 'Deleted successfully' });
   } catch (error) {
     next(error);
   }

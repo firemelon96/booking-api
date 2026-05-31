@@ -14,7 +14,7 @@ export const createTransferSchema = z.object({
   destinationId: z.string(),
   pricingMode: z.enum(TransferPricingMode),
   maxPassengers: z.number(),
-  hasSchedule: z.boolean().default(false),
+  hasSchedule: z.boolean(),
   pricing: transferPricingSchema.array(),
   schedules: transferScheduleSchema.array(),
   amenityIds: z.string().array(),
@@ -28,9 +28,8 @@ export const baseTransferSchema = z.object({
   originId: z.string(),
   destinationId: z.string(),
   pricingMode: z.enum(TransferPricingMode),
-  basePrice: z.number(),
   maxPassengers: z.number(),
-  hasSchedule: z.boolean().default(false),
+  hasSchedule: z.boolean(),
 });
 
 export const updateBaseTransferSchema = baseTransferSchema.partial();
