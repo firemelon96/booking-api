@@ -39,6 +39,7 @@ model User {
   accommodations  Accommodation[]
   tours Tour[]
   transfers Transfer[]
+  rentals Rental[]
 
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
@@ -337,7 +338,12 @@ model Image {
   transferId  String?
   transfer Transfer? @relation(fields: [transferId], references: [id], onDelete: Cascade)
 
+  rentalId String?
+  rental Rental? @relation(fields: [rentalId], references: [id], onDelete: Cascade)
+
   userProfile User? @relation("UserProfileImage")
+
+  rentalItemImage RentalItem? @relation("RentalItemImage")
 
   createdAt DateTime @default(now())
 }
@@ -941,6 +947,9 @@ enum TransferLocationType {
 model Rental {
   id String @id @default(uuid())
 
+  ownerId String
+  owner User @relation(fields: [ownerId], references: [id])
+
   name String
   slug String @unique
 
@@ -948,33 +957,47 @@ model Rental {
 
   type RentalType
 
-  pricingMode RentalPricingMode
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  quantity Int
+  rentalItems RentalItem[]
 
-  maxGuests Int?
+  amenities RentalAmenity[]
 
-  hasHourlyPricing Boolean @default(false)
+  images Image[]
+}
 
-  hasDailyPricing Boolean @default(true)
+model RentalItem {
+  id String @id @default(uuid())
+
+  rentalId String
+  rental Rental @relation(fields: [rentalId], references: [id], onDelete: Cascade)
+
+  name String
+  description String?
+
+  itemCode String @unique
+
+  quantity Int @default(1)
+
+  rentalImageId String?  @unique
+  itemImage Image? @relation("RentalItemImage", fields: [rentalImageId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  pricing RentalPricing[]
-
   inventories RentalInventory[]
 
-  bookings RentalBooking[]
+  pricing RentalPricing[]
 
-  amenities RentalAmenity[]
+  bookings RentalBooking[]
 }
 
 model RentalInventory {
   id String @id @default(uuid())
 
-  rentalId String 
-  rental Rental @relation(fields: [rentalId], references: [id], onDelete: Cascade)
+  rentalItemId String
+  rentalItem RentalItem @relation(fields: [rentalItemId], references: [id], onDelete: Cascade)
 
   date DateTime
 
@@ -986,14 +1009,14 @@ model RentalInventory {
 
   createdAt DateTime @default(now())
 
-  @@unique([rentalId, date])
+  @@unique([rentalItemId, date])
 }
 
 model RentalPricing {
   id String @id @default(uuid())
 
-  rentalId String
-  rental Rental @relation(fields: [rentalId], references: [id], onDelete: Cascade)
+  rentalItemId String
+  rentalItem RentalItem @relation(fields: [rentalItemId], references: [id], onDelete: Cascade)
 
   pricingType RentalPricingType
 
@@ -1008,14 +1031,13 @@ model RentalBooking {
   bookingId String @unique
   booking Booking @relation(fields: [bookingId], references: [id], onDelete:  Cascade)
 
-  rentalId String
-  rental Rental @relation(fields: [rentalId], references: [id])
+  rentalItemId String
+  item RentalItem @relation(fields: [rentalItemId], references: [id])
 
   startDate DateTime
   endDate DateTime
 
   quantity Int
-  guests Int?
 
   pricingType RentalPricingType
 
@@ -1049,11 +1071,6 @@ enum RentalType {
   CAMPING_GEAR
   BOAT
   OTHER
-}
-
-enum RentalPricingMode {
-  FIXED
-  FLEXIBLE
 }
 
 enum RentalPricingType {

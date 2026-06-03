@@ -12,6 +12,7 @@ import {
 import transferBookingRoute from './bookings/bookinng.route';
 import pricingRoute from './pricings/pricing.route';
 import scheduleRoute from './schedules/schedule.route';
+import calendarRoute from './calendar/transfer-calendar.route';
 
 const router = Router({ mergeParams: true });
 
@@ -33,9 +34,10 @@ router.delete(
   removeTransferController,
 );
 
-router.post('/:transferId/booking', transferBookingRoute);
+router.post('/:transferId/bookings', transferBookingRoute);
 
-router.use('/:transferId', pricingRoute);
-router.use('/:transferId', scheduleRoute);
+router.use('/:transferId/pricings', pricingRoute);
+router.use('/:transferId/schedules', scheduleRoute);
+router.use('/:slug/calendar', calendarRoute);
 
 export default router;

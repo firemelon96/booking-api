@@ -14,6 +14,7 @@ import amenityRoutes from './modules/amenity/amenity.route';
 import accommodationRoutes from './modules/accommodations/accommodation.route';
 import transferRoutes from './modules/transfers/transfer.route';
 import locationRoutes from './modules/locations/location.route';
+import rentalRoutes from './modules/rentals/rental.route';
 
 import cookieParser from 'cookie-parser';
 import { errorHandler } from './middlewares/error.middleware';
@@ -34,19 +35,21 @@ app.get('/', (_req, res) => {
 app.use('/api/auth', authRoutes);
 
 //public routes
-app.use('/api/tours', tourRoutes);
+app.use('/api/users', userRoutes);
 
 app.use('/api/bookings', bookingRoutes);
 //authorized routes
-app.use('/api/users', userRoutes);
-
-app.use('/api/webhook', webhookRoutes);
-
-app.use('/api/amenity', amenityRoutes);
+app.use('/api/tours', tourRoutes);
 
 app.use('/api/accommodations', accommodationRoutes);
 
 app.use('/api/transfers', transferRoutes);
+
+app.use('/api/rentals', rentalRoutes);
+
+app.use('/api/webhook', webhookRoutes);
+
+app.use('/api/amenity', amenityRoutes);
 
 app.use('/api/locations', locationRoutes);
 
