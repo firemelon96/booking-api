@@ -27,10 +27,10 @@ export async function findBookingOrThrow({
   userId,
 }: {
   bookingId: string;
-  role?: Role;
-  userId?: string;
+  role: Role;
+  userId: string;
 }) {
-  const booking = await prisma.booking.findUnique({
+  const booking = await prisma.booking.findFirst({
     where: {
       id: bookingId,
       ...(role === 'USER' ? { userId } : {}),

@@ -13,10 +13,9 @@ export const createTransferSchema = z.object({
   originId: z.string(),
   destinationId: z.string(),
   pricingMode: z.enum(TransferPricingMode),
-  maxPassengers: z.number(),
-  hasSchedule: z.boolean(),
+  hasSchedule: z.boolean().optional(),
   pricing: transferPricingSchema.array(),
-  schedules: transferScheduleSchema.array(),
+  schedules: transferScheduleSchema.array().optional(),
   amenityIds: z.string().array(),
   imageIds: z.string().array(),
 });

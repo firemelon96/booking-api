@@ -8,9 +8,9 @@ export async function getTransferCalendarController(
   res: Response,
   next: NextFunction,
 ) {
-  const slug = transferSlugParams.safeParse(req.params);
+  const params = transferSlugParams.safeParse(req.params);
 
-  if (!slug.success) {
+  if (!params.success) {
     return res.status(400).json({ error: 'Invalid transfer slug' });
   }
 
@@ -21,7 +21,10 @@ export async function getTransferCalendarController(
   }
 
   try {
-    const availability = await getTransferCalendarService(payload.data);
+    const availability = await getTransferCalendarService(
+      params.data.slug,
+      payload.data,
+    );
     return res.json(availability);
   } catch (error) {
     next(error);

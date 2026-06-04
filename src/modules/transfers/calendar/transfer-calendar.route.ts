@@ -5,6 +5,6 @@ import { getTransferCalendarController } from './transfer-calendar.controller';
 
 const router = Router({ mergeParams: true });
 
-router.get('/', authenticate, requireAdmin, getTransferCalendarController);
+router.get('/', getTransferCalendarController);
 
 export default router;

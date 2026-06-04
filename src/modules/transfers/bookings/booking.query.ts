@@ -3,15 +3,11 @@ import { Role } from '../../../generated/prisma/enums';
 
 export async function findTransferBookingOrThrow({
   bookingId,
-  userId,
-  role,
 }: {
   bookingId: string;
-  userId: string;
-  role: Role;
 }) {
   const transferBooking = await prisma.transferBooking.findUnique({
-    where: { bookingId, ...(role === 'USER' ? { userId } : {}) },
+    where: { bookingId },
     include: { booking: true, schedule: true },
   });
 

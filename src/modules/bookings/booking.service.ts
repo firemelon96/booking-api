@@ -87,6 +87,23 @@ export async function getAllBookingsService(
         user: true,
         tourBooking: true,
         accommodationBooking: true,
+        transferBooking: {
+          include: {
+            transfer: {
+              include: {
+                pricing: {
+                  select: {
+                    pricingType: true,
+                    minPassengers: true,
+                    maxPassengers: true,
+                    price: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        rentalBooking: true,
       },
     }),
     prisma.booking.count({ where }),
@@ -111,6 +128,12 @@ export async function getAllBookingsService(
       endDate: b.tourBooking?.endDate,
       specialRequests: b.accommodationBooking?.specialRequests,
       notes: b.tourBooking?.notes,
+      pricing: b.transferBooking?.transfer.pricing.map((p) => ({
+        min: p.minPassengers,
+        max: p.maxPassengers,
+        price: p.price,
+        type: p.pricingType,
+      })),
     })),
 
     meta: {

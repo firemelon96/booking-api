@@ -9,7 +9,7 @@ import {
   updateTransferController,
 } from './transfer.controller';
 
-import transferBookingRoute from './bookings/bookinng.route';
+import transferBookingRoute from './bookings/booking.route';
 import pricingRoute from './pricings/pricing.route';
 import scheduleRoute from './schedules/schedule.route';
 import calendarRoute from './calendar/transfer-calendar.route';
@@ -34,7 +34,7 @@ router.delete(
   removeTransferController,
 );
 
-router.post('/:transferId/bookings', transferBookingRoute);
+router.use('/:transferId/bookings', transferBookingRoute);
 
 router.use('/:transferId/pricings', pricingRoute);
 router.use('/:transferId/schedules', scheduleRoute);

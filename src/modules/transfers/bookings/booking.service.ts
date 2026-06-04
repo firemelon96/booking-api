@@ -21,8 +21,8 @@ import {
 import { logBookingAction } from '../../bookings/audit/booking-audit.service';
 import { findTransferBookingOrThrow } from './booking.query';
 import { BOOKING_RULES } from '../../../constant/constant';
-import { release } from 'node:os';
 import { BookingInputType } from '../../bookings/booking.type';
+import { validateTransferSchedule } from '../schedules/schedule.query';
 
 export async function createTransferBookingService(
   transferId: string,
@@ -51,7 +51,7 @@ export async function createTransferBookingService(
 
   let selectedSchedule = null;
 
-  if (pricingType === 'JOINER') {
+  if (transfer.hasSchedule) {
     if (!scheduleId) {
       throw new Error('Schedule is required for joiner booking.');
     }
@@ -65,6 +65,10 @@ export async function createTransferBookingService(
     }
   }
 
+  if (!transfer.hasSchedule && scheduleId) {
+    throw new Error('Exclusive transfer does not have schedule');
+  }
+
   const selectedPricing = transfer.pricing.find(
     (pricing) => pricing.pricingType === pricingType,
   );
@@ -73,8 +77,9 @@ export async function createTransferBookingService(
     throw new Error('Transfer pricing not found');
   }
 
-  const maxPassengers =
-    transfer.maxPassengers ?? selectedPricing.maxPassengers ?? null;
+  const maxPassengers = selectedSchedule
+    ? selectedSchedule.maxPassengers
+    : passengers;
 
   return prisma.$transaction(async (tx) => {
     const reference = await createUniqueBookingReference(tx);
@@ -207,8 +212,6 @@ export async function rescheduleTransferBooking(
 
   const transferBooking = await findTransferBookingOrThrow({
     bookingId,
-    userId,
-    role,
   });
 
   const booking = transferBooking.booking;
@@ -217,28 +220,58 @@ export async function rescheduleTransferBooking(
     throw new Error('Only confirmed bookings can be rescheduled');
   }
 
-  if (booking.rescheduleCount > BOOKING_RULES.MAX_RESCHEDULES) {
+  if (booking.rescheduleCount >= BOOKING_RULES.MAX_RESCHEDULES) {
     throw new Error('Maximum reschedule attempts exceeded');
   }
 
-  const oldTravelDate = transferBooking.date;
+  const oldScheduleId = transferBooking.scheduleId ?? null;
+  const oldTravelDate = startOfDay(transferBooking.date);
 
   const newTravelDate = startOfDay(travelDate);
 
+  const isSameDate = oldTravelDate.getTime() === newTravelDate.getTime();
+
   if (newTravelDate < new Date()) {
     throw new Error('Invalid date selected');
+  }
+
+  let selectedSchedule = null;
+
+  if (!oldScheduleId) {
+    if (scheduleId) {
+      throw new Error('Schedule is not required');
+    }
+
+    if (isSameDate) {
+      throw new Error('Please select a different travel date');
+    }
+  } else {
+    if (!scheduleId) {
+      throw new Error('Please select a schedule');
+    }
+
+    const isSameSchedule = oldScheduleId === scheduleId;
+
+    if (isSameSchedule && isSameDate) {
+      throw new Error('Please select a different travel date or schedule');
+    }
+
+    selectedSchedule = await validateTransferSchedule(
+      transferBooking.transferId,
+      scheduleId,
+    );
   }
 
   return prisma.$transaction(async (tx) => {
     await lockTransferInventory(tx, {
       transferId: transferBooking.transferId,
       travelDate: oldTravelDate,
-      scheduleId,
+      scheduleId: oldScheduleId,
     });
 
     await releaseTransferInventory(tx, {
       transferId: transferBooking.transferId,
-      scheduleId,
+      scheduleId: oldScheduleId,
       travelDate: oldTravelDate,
       passengers: transferBooking.passengers,
       pricingType: transferBooking.pricingType,
@@ -247,34 +280,34 @@ export async function rescheduleTransferBooking(
     await ensureTransferInventory(tx, {
       transferId: transferBooking.transferId,
       travelDate: newTravelDate,
-      maxPassengers: transferBooking.passengers,
-      scheduleId,
+      maxPassengers:
+        selectedSchedule?.maxPassengers ?? transferBooking.passengers,
+      scheduleId: selectedSchedule?.scheduleId,
     });
 
     await lockTransferInventory(tx, {
-      transferId: transferBooking.transferId,
+      scheduleId: selectedSchedule?.scheduleId,
       travelDate: newTravelDate,
-      scheduleId,
+      transferId: transferBooking.transferId,
     });
 
     const reservationResult = await reserveTransferInventory(tx, {
-      transferId: transferBooking.transferId,
-      travelDate: newTravelDate,
-      isAdmin,
-      passengers: transferBooking.passengers,
-      pricingType: transferBooking.pricingType,
       userId,
-      scheduleId,
+      isAdmin,
+      scheduleId: selectedSchedule?.scheduleId,
+      travelDate: newTravelDate,
+      passengers: transferBooking.passengers,
+      transferId: transferBooking.transferId,
+      pricingType: transferBooking.pricingType,
     });
 
     const resched = await tx.booking.update({
       where: { id: bookingId },
       data: {
         type: 'TRANSFER',
-        rescheduleCount: { increment: 1 },
         lastRescheduleDate: new Date(),
+        rescheduleCount: { increment: 1 },
         isAdminOverride: reservationResult.hasAdminOverride,
-        bookingStatus: isAdmin ? 'CONFIRMED' : 'PENDING',
       },
     });
 
@@ -282,17 +315,17 @@ export async function rescheduleTransferBooking(
       where: { bookingId },
       data: {
         date: newTravelDate,
-        scheduleId: scheduleId ?? null,
+        scheduleId: selectedSchedule?.scheduleId,
       },
     });
 
     await logBookingAction({
       tx,
-      userId,
       role,
-      previousValue: booking,
+      userId,
       newValue: resched,
       action: 'RESCHEDULED',
+      previousValue: booking,
     });
 
     return resched;
@@ -304,13 +337,11 @@ export async function cancelTransferBooking({
   userId,
   role,
 }: BookingInputType) {
-  const isAdmin = role === 'ADMIN';
-
   const transferBooking = await findTransferBookingOrThrow({
     bookingId,
-    userId,
-    role,
   });
+
+  const isAdmin = role === 'ADMIN';
 
   const booking = transferBooking.booking;
 
@@ -327,7 +358,7 @@ export async function cancelTransferBooking({
       BOOKING_RULES.RESCHEDULE_CUTOFF_HOURS * 60 * 60 * 1000,
   );
 
-  if (new Date() > cutoff) {
+  if (new Date() >= cutoff) {
     throw new Error(
       `Cancellations must be made at least ${BOOKING_RULES.RESCHEDULE_CUTOFF_HOURS} hours before the booking start time.`,
     );
@@ -355,7 +386,8 @@ export async function cancelTransferBooking({
       data: {
         type: 'TRANSFER',
         bookingStatus: 'CANCELLED',
-        cancellationDate: new Date(),
+        cancelledAt: new Date(),
+        isAdminOverride: isAdmin,
       },
     });
 

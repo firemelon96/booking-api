@@ -99,8 +99,17 @@ export async function getAllTransferService({
         },
         schedules: {
           select: {
+            id: true,
             departureTime: true,
             maxPassengers: true,
+          },
+        },
+        pricing: {
+          select: {
+            maxPassengers: true,
+            minPassengers: true,
+            price: true,
+            pricingType: true,
           },
         },
       },
@@ -116,12 +125,18 @@ export async function getAllTransferService({
       type: t.type,
       origin: t.origin.name,
       destination: t.destination.name,
-      maxPassengers: t.maxPassengers,
       hasSchedule: t.hasSchedule,
       amenities: t.amenities.map((a) => a.amenity.name),
       schedules: t.schedules.map((s) => ({
+        id: s.id,
         departureTime: s.departureTime,
         maxPassengers: s.maxPassengers,
+      })),
+      pricing: t.pricing.map((p) => ({
+        min: p.minPassengers,
+        max: p.maxPassengers,
+        price: p.price,
+        type: p.pricingType,
       })),
     })),
     meta: {

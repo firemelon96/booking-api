@@ -293,10 +293,13 @@ export async function releaseTransferInventory(
   if (pricingType === 'PRIVATE') {
     await tx.transferInventory.update({
       where: {
-        id: transferId,
+        id: inventory.id,
       },
       data: {
-        bookedSeats: 0,
+        bookedSeats: {
+          decrement: passengers,
+        },
+        availableSeats: 0,
       },
     });
 
@@ -304,7 +307,7 @@ export async function releaseTransferInventory(
   }
 
   await tx.transferInventory.update({
-    where: { id: transferId },
+    where: { id: inventory.id },
     data: {
       bookedSeats: {
         decrement: passengers,
