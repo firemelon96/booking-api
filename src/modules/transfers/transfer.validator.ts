@@ -42,12 +42,20 @@ export const transferSlugParams = z.object({
 });
 
 export const transferQuerySchema = z.object({
-  page: z.number().optional(),
   limit: z.number().optional(),
-  sort: z.string().optional(),
   search: z.string().optional(),
   type: z.enum(TransferType).optional(),
   pricingMode: z.enum(TransferPricingMode).optional(),
+  cursor: z.string().optional(),
+
+  page: z.number().optional(),
+  sort: z.string().optional(),
+});
+
+export const transferFilterSchema = z.object({
+  search: z.string().optional(),
+  pricingMode: z.enum(TransferPricingMode).optional(),
+  type: z.enum(TransferType).optional(),
 });
 
 //add more after pushing the database online

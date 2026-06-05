@@ -1,5 +1,6 @@
 import cloudinary from '../../config/cloudinary';
 import { prisma } from '../../config/prisma';
+import { Prisma } from '../../generated/prisma/client';
 import { slugify } from '../../utils/slugify';
 import { assignTransferImages } from './images/image.service';
 import { validateTransferPricing } from './pricings/pricing.rule';
@@ -7,8 +8,10 @@ import { createTransferPricing } from './pricings/pricing.service';
 import { addSchedules } from './schedules/schedule.service';
 import { transferMapper } from './transfer.mapper';
 import {
+  buildTransferWhere,
   findTransferBySlugOrFail,
   findTransferOrThrow,
+  parseSort,
   throwExistingSlug,
 } from './transfer.query';
 import {
@@ -17,79 +20,53 @@ import {
   UpdateBaseTransferInput,
 } from './transfer.type';
 
-export async function getAllTransferService({
+export async function getAllTransferServiceAdmin({
   page = 1,
-  search,
-  sort = 'createdAt:desc',
   limit = 30,
-  pricingMode,
+  sort = 'createdAt:desc',
+  search,
   type,
+  pricingMode,
 }: TransferQueryInput) {
   const safePage = Math.max(1, page);
   const safeLimit = Math.min(30, limit);
   const skip = (safePage - 1) * safeLimit;
 
-  const [sortField, sortOrder] = sort?.split(':');
+  const { field, order } = parseSort(sort);
 
-  const orderBy = {
-    [sortField || 'createdAt']: sortOrder === 'asc' ? 'asc' : 'desc',
-  };
-
-  const where: any = {};
-
-  if (type) where.type = type;
-  if (pricingMode) where.pricingMode = pricingMode;
-
-  if (search) {
-    where.OR = [
-      {
-        name: {
-          contains: search,
-          mode: 'insensitive',
-        },
-      },
-      {
-        description: {
-          contains: search,
-          mode: 'insensitive',
-        },
-      },
-      {
-        origin: {
-          name: {
-            contains: search,
-            mode: 'insensitive',
-          },
-        },
-        destination: {
-          name: {
-            contains: search,
-            mode: 'insensitive',
-          },
-        },
-      },
-    ];
-  }
+  const where = buildTransferWhere({ search, type, pricingMode });
 
   const [data, total] = await prisma.$transaction([
     prisma.transfer.findMany({
       where,
       skip,
       take: safeLimit,
-      orderBy,
-      include: {
+
+      orderBy: {
+        [field]: order,
+      },
+
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        type: true,
+        hasSchedule: true,
+
         origin: {
           select: {
             name: true,
           },
         },
+
         destination: {
           select: {
             name: true,
           },
         },
+
         amenities: {
-          include: {
+          select: {
             amenity: {
               select: {
                 name: true,
@@ -97,6 +74,7 @@ export async function getAllTransferService({
             },
           },
         },
+
         schedules: {
           select: {
             id: true,
@@ -104,46 +82,165 @@ export async function getAllTransferService({
             maxPassengers: true,
           },
         },
+
         pricing: {
           select: {
-            maxPassengers: true,
             minPassengers: true,
+            maxPassengers: true,
             price: true,
             pricingType: true,
           },
         },
       },
     }),
-    prisma.transfer.count({ where }),
+
+    prisma.transfer.count({
+      where,
+    }),
   ]);
 
-  return {
-    data: data.map((t) => ({
-      id: t.id,
-      transferName: t.name,
-      slug: t.slug,
-      type: t.type,
-      origin: t.origin.name,
-      destination: t.destination.name,
-      hasSchedule: t.hasSchedule,
-      amenities: t.amenities.map((a) => a.amenity.name),
-      schedules: t.schedules.map((s) => ({
-        id: s.id,
-        departureTime: s.departureTime,
-        maxPassengers: s.maxPassengers,
-      })),
-      pricing: t.pricing.map((p) => ({
-        min: p.minPassengers,
-        max: p.maxPassengers,
-        price: p.price,
-        type: p.pricingType,
-      })),
+  const mapped = data.map((t) => ({
+    id: t.id,
+    transferName: t.name,
+    slug: t.slug,
+    type: t.type,
+    origin: t.origin.name,
+    destination: t.destination.name,
+    hasSchedule: t.hasSchedule,
+    amenities: t.amenities.map((a) => a.amenity.name),
+    schedules: t.schedules.map((s) => ({
+      id: s.id,
+      departureTime: s.departureTime,
+      maxPassengers: s.maxPassengers,
     })),
+    pricing: t.pricing.map((p) => ({
+      min: p.minPassengers,
+      max: p.maxPassengers,
+      price: p.price,
+      type: p.pricingType,
+    })),
+  }));
+
+  return {
+    data: mapped,
     meta: {
       total,
       page: safePage,
       pageSize: safeLimit,
       pageCount: Math.ceil(total / safeLimit),
+    },
+  };
+}
+
+export async function getAllTransferService({
+  search,
+  limit = 30,
+  pricingMode,
+  type,
+  cursor,
+}: TransferQueryInput) {
+  const safeLimit = Math.min(30, limit);
+
+  const where = buildTransferWhere({ pricingMode, search, type });
+
+  const transfers = await prisma.transfer.findMany({
+    where,
+    take: safeLimit + 1,
+    ...(cursor && {
+      cursor: { id: cursor },
+      skip: 1,
+    }),
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      type: true,
+      hasSchedule: true,
+      origin: {
+        select: {
+          name: true,
+        },
+      },
+      destination: {
+        select: {
+          name: true,
+        },
+      },
+      amenities: {
+        select: {
+          amenity: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
+      schedules: {
+        select: {
+          id: true,
+          maxPassengers: true,
+          departureTime: true,
+        },
+      },
+      pricing: {
+        select: {
+          minPassengers: true,
+          maxPassengers: true,
+          price: true,
+          pricingType: true,
+        },
+      },
+    },
+  });
+
+  const hasNextPage = transfers.length > safeLimit;
+
+  const data = hasNextPage ? transfers.slice(0, safeLimit) : transfers;
+
+  const nextCursor = hasNextPage ? data[data.length - 1].id : null;
+
+  const mappedData = data.map(
+    ({
+      id,
+      name,
+      slug,
+      type,
+      origin,
+      destination,
+      hasSchedule,
+      amenities,
+      schedules,
+      pricing,
+    }) => ({
+      id,
+      transferName: name,
+      slug,
+      type,
+      origin: origin.name,
+      destination: destination.name,
+      hasSchedule,
+      amenities: amenities.map((a) => a.amenity.name),
+      schedules: schedules.map((s) => ({
+        id: s.id,
+        departureTime: s.departureTime,
+        maxPassengers: s.maxPassengers,
+      })),
+      pricing: pricing.map((p) => ({
+        min: p.minPassengers,
+        max: p.maxPassengers,
+        price: p.price,
+        type: p.pricingType,
+      })),
+    }),
+  );
+
+  return {
+    mappedData,
+    meta: {
+      limit: safeLimit,
+      nextCursor,
+      hasNextPage,
     },
   };
 }

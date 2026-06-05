@@ -123,8 +123,6 @@ export async function createBulkRentalItemsService(
           })),
         });
       }
-
-      return rentalItem;
     }
   });
 }

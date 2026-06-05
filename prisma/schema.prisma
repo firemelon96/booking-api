@@ -341,9 +341,9 @@ model Image {
   rentalId String?
   rental Rental? @relation(fields: [rentalId], references: [id], onDelete: Cascade)
 
-  userProfile User? @relation("UserProfileImage")
+  items RentalItemImage[]
 
-  rentalItemImage RentalItem? @relation("RentalItemImage")
+  userProfile User? @relation("UserProfileImage")
 
   createdAt DateTime @default(now())
 }
@@ -974,12 +974,9 @@ model RentalItem {
   name String
   description String?
 
-  itemCode String @unique
+  itemCode String
 
   quantity Int @default(1)
-
-  rentalImageId String?  @unique
-  itemImage Image? @relation("RentalItemImage", fields: [rentalImageId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -989,6 +986,30 @@ model RentalItem {
   pricing RentalPricing[]
 
   bookings RentalBooking[]
+
+  rentalItemImages RentalItemImage[]
+
+  @@unique([rentalId, itemCode])
+  @@index([rentalId])
+}
+
+model RentalItemImage {
+  id String @id @default(uuid())
+
+  rentalItemId String
+  rentalItem RentalItem @relation(fields: [rentalItemId], references: [id], onDelete: Cascade)
+
+  imageId String
+  image Image @relation(fields: [imageId], references: [id])
+
+  isPrimary Boolean @default(false)
+
+  position Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([rentalItemId])
+  @@index([imageId])
 }
 
 model RentalInventory {

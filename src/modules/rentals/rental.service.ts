@@ -1,7 +1,7 @@
 import { prisma } from '../../config/prisma';
 import { slugify } from '../../utils/slugify';
 import {
-  findExistingRentalBySlug,
+  throwExistingRentalBySlug,
   findRentalByIdOrFail,
   findRentalBySlugOrFail,
 } from './rental.query';
@@ -140,11 +140,11 @@ export async function getRentalDetailService(slug: string) {
 
 export async function createRentalService(
   userId: string,
-  { items, name, type, amenityIds, description }: CreateRentalBody,
+  { items, name, type, amenityIds, description, imageIds }: CreateRentalBody,
 ) {
   const slug = slugify(name);
 
-  await findExistingRentalBySlug(slug);
+  await throwExistingRentalBySlug(slug);
 
   return prisma.$transaction(async (tx) => {
     const rental = await tx.rental.create({
@@ -163,6 +163,18 @@ export async function createRentalService(
           rentalId: rental.id,
           amenityId,
         })),
+      });
+    }
+
+    //attach image
+    if (imageIds && imageIds.length > 0) {
+      await tx.image.updateMany({
+        where: { id: { in: imageIds } },
+        data: {
+          rentalId: rental.id,
+          status: 'ACTIVE',
+          type: 'RENTALS',
+        },
       });
     }
 
@@ -194,14 +206,14 @@ export async function createRentalService(
 
 export async function updateRentalService(
   rentalId: string,
-  { amenityIds, ...rentalData }: UpdateRentalBody,
+  { amenityIds, imageIds, ...rentalData }: UpdateRentalBody,
 ) {
   await findRentalByIdOrFail(rentalId);
 
   const slug = rentalData.name ? slugify(rentalData.name) : undefined;
 
   if (slug) {
-    await findExistingRentalBySlug(slug);
+    await throwExistingRentalBySlug(slug);
   }
 
   return prisma.$transaction(async (tx) => {

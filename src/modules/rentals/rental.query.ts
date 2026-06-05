@@ -10,7 +10,7 @@ export async function findRentalBySlugOrFail(slug: string) {
   return rental;
 }
 
-export async function findExistingRentalBySlug(slug: string) {
+export async function throwExistingRentalBySlug(slug: string) {
   const exist = await prisma.rental.findUnique({ where: { slug } });
 
   if (exist) {

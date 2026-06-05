@@ -2,10 +2,7 @@ import { eachDayOfInterval, startOfDay } from 'date-fns';
 import { prisma } from '../../../config/prisma';
 import { getMonthRange } from '../../../utils/helper';
 import { CalendarInput } from './calendar.type';
-import {
-  findAccommodationBySlug,
-  findAccommodationOrFail,
-} from '../accommodation.query';
+import { findAccommodationBySlug } from '../accommodation.query';
 
 export async function calendarAccommodationService(
   slug: string,

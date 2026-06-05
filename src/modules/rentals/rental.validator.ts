@@ -16,6 +16,7 @@ export const createRentalBodySchema = z.object({
   type: z.enum(RentalType),
   amenityIds: z.string().array(),
   items: z.array(rentalItemsSchema),
+  imageIds: z.string().array().optional(),
 });
 
 export const updateRentalBodySchema = z
@@ -24,6 +25,7 @@ export const updateRentalBodySchema = z
     description: z.string().optional(),
     type: z.enum(RentalType),
     amenityIds: z.array(z.string()).optional(),
+    imageIds: z.array(z.string()).optional(),
   })
   .partial();
 

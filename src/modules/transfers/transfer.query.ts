@@ -1,4 +1,32 @@
 import { prisma } from '../../config/prisma';
+import { Prisma } from '../../generated/prisma/client';
+import { TransferFilterInput } from './transfer.type';
+
+type SortOrder = 'asc' | 'desc';
+
+const ALLOWED_SORT_FIELDS = [
+  'createdAt',
+  'name',
+  'type',
+  'pricingMode',
+] as const;
+
+type SortField = (typeof ALLOWED_SORT_FIELDS)[number];
+
+export function parseSort(sort?: string): {
+  field: SortField;
+  order: SortOrder;
+} {
+  const [rawField, rawOrder] = sort?.split(':') ?? [];
+
+  const field = ALLOWED_SORT_FIELDS.includes(rawField as SortField)
+    ? (rawField as SortField)
+    : 'createdAt';
+
+  const order: SortOrder = rawOrder === 'asc' ? 'asc' : 'desc';
+
+  return { field, order };
+}
 
 export async function throwExistingSlug(slug: string) {
   //lookup for the tranfer using slug and trow if exist
@@ -51,4 +79,47 @@ export async function findTransferOrThrow(transferId: string) {
   }
 
   return transfer;
+}
+
+export function buildTransferWhere({
+  pricingMode,
+  search,
+  type,
+}: TransferFilterInput): Prisma.TransferWhereInput {
+  return {
+    ...(type && { type }),
+    ...(pricingMode && { pricingMode }),
+    ...(search && {
+      OR: [
+        {
+          name: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          description: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          origin: {
+            name: {
+              contains: search,
+              mode: 'insensitive',
+            },
+          },
+        },
+        {
+          destination: {
+            name: {
+              contains: search,
+              mode: 'insensitive',
+            },
+          },
+        },
+      ],
+    }),
+  };
 }
