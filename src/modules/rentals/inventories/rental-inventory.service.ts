@@ -121,4 +121,29 @@ export async function reserveRentalInventory(
   };
 }
 
-export async function releaseInventory() {}
+export async function releaseRentalInventory(
+  tx: Prisma.TransactionClient,
+  {
+    itemId,
+    dates,
+    quantity,
+  }: {
+    itemId: string;
+    dates: Date[];
+    quantity: number;
+  },
+) {
+  for (const date of dates) {
+    await tx.rentalInventory.updateMany({
+      where: {
+        rentalItemId: itemId,
+        date,
+      },
+      data: {
+        bookedUnits: {
+          decrement: quantity,
+        },
+      },
+    });
+  }
+}

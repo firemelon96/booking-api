@@ -77,6 +77,7 @@ export async function getAllRentalsService({
       type: r.type,
       amenities: r.amenities.map((a) => a.amenity.slug),
       items: r.rentalItems.map((i) => ({
+        id: i.id,
         name: i.name,
         description: i.description,
         itemCode: i.itemCode,

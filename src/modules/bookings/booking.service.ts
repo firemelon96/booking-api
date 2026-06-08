@@ -12,6 +12,7 @@ import { logBookingAction } from './audit/booking-audit.service';
 import { findBookingOrThrow } from './booking.query';
 import {
   mapAccommodationBooking,
+  mapRentalBooking,
   mapTourBooking,
   mapTransferBooking,
 } from './booking-response.mapped';
@@ -27,6 +28,11 @@ import {
   cancelTransferBooking,
   rescheduleTransferBooking,
 } from '../transfers/bookings/booking.service';
+import {
+  cancelRentalBooking,
+  rescheduleRentalItemBookingService,
+} from '../rentals/bookings/rental-booking.service';
+import { BookingWhereInput } from '../../generated/prisma/models';
 
 export async function getAllBookingsService(
   userId: string,
@@ -52,30 +58,67 @@ export async function getAllBookingsService(
     [sortField || 'createdAt']: sortOrder === 'asc' ? 'asc' : 'desc',
   };
 
-  const where: any = {};
-
-  if (role === 'USER') {
-    where.userId = userId;
-  }
-
-  if (bookingStatus) where.bookingStatus = bookingStatus;
-  if (paymentStatus) where.paymentStatus = paymentStatus;
-  if (reference) where.reference = reference;
-  if (type) where.type = type;
-
-  if (search) {
-    where.OR = [
-      {
-        paidAmount: { contains: search, mode: 'insensitive' },
-      },
-      {
-        remainingBalance: { contains: search, mode: 'insensitive' },
-      },
-      {
-        type: { contains: search, mode: 'insensitive' },
-      },
-    ];
-  }
+  const where: BookingWhereInput = {
+    ...(userId && { userId }),
+    ...(bookingStatus && { bookingStatus }),
+    ...(paymentStatus && { paymentStatus }),
+    ...(reference && { reference }),
+    ...(type && { type }),
+    ...(search && {
+      OR: [
+        {
+          tourBooking: {
+            tour: {
+              name: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+        {
+          accommodationBooking: {
+            accommodation: {
+              name: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+        {
+          accommodationBooking: {
+            unit: {
+              name: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+        {
+          transferBooking: {
+            transfer: {
+              name: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+        {
+          rentalBooking: {
+            item: {
+              name: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+      ],
+    }),
+  };
 
   const [data, total] = await prisma.$transaction([
     prisma.booking.findMany({
@@ -85,25 +128,30 @@ export async function getAllBookingsService(
       orderBy,
       include: {
         user: true,
-        tourBooking: true,
-        accommodationBooking: true,
-        transferBooking: {
-          include: {
-            transfer: {
-              include: {
-                pricing: {
-                  select: {
-                    pricingType: true,
-                    minPassengers: true,
-                    maxPassengers: true,
-                    price: true,
-                  },
-                },
-              },
-            },
+        tourBooking: {
+          select: { tour: true, startDate: true, endDate: true },
+        },
+        accommodationBooking: {
+          select: {
+            accommodation: true,
+            unit: true,
+            checkIn: true,
+            checkOut: true,
           },
         },
-        rentalBooking: true,
+        transferBooking: {
+          select: {
+            transfer: true,
+            date: true,
+          },
+        },
+        rentalBooking: {
+          select: {
+            item: true,
+            startDate: true,
+            endDate: true,
+          },
+        },
       },
     }),
     prisma.booking.count({ where }),
@@ -118,22 +166,18 @@ export async function getAllBookingsService(
       bookingStatus: b.bookingStatus,
       paymentStatus: b.paymentStatus,
       totalPrice: b.totalPrice,
+      tourName: b.tourBooking?.tour.name,
+      tourStart: b.tourBooking?.startDate,
+      tourEnd: b.tourBooking?.endDate,
+      accommodationName: b.accommodationBooking?.accommodation.name,
+      accommodationUnitName: b.accommodationBooking?.unit?.name,
       checkIn: b.accommodationBooking?.checkIn,
       checkOut: b.accommodationBooking?.checkOut,
-      expiresAt:
-        b.expiresAt && b.expiresAt?.getTime() < new Date(Date.now()).getTime()
-          ? 'expired'
-          : b.expiresAt,
-      startDate: b.tourBooking?.startDate,
-      endDate: b.tourBooking?.endDate,
-      specialRequests: b.accommodationBooking?.specialRequests,
-      notes: b.tourBooking?.notes,
-      pricing: b.transferBooking?.transfer.pricing.map((p) => ({
-        min: p.minPassengers,
-        max: p.maxPassengers,
-        price: p.price,
-        type: p.pricingType,
-      })),
+      rentalItemName: b.rentalBooking?.item.name,
+      rentalStart: b.rentalBooking?.startDate,
+      rentalEnd: b.rentalBooking?.endDate,
+      transferName: b.transferBooking?.transfer.name,
+      travelDate: b.transferBooking?.date,
     })),
 
     meta: {
@@ -202,6 +246,12 @@ export async function rescheduleBooking(
         scheduleId: payload.scheduleId,
       });
 
+    case 'RENTAL':
+      return rescheduleRentalItemBookingService(bookingId, userId, role, {
+        startDate: payload.startDate!,
+        endDate: payload.endDate!,
+      });
+
     default:
       throw new Error('Invalid booking type');
   }
@@ -224,6 +274,9 @@ export async function cancelbooked({
     case 'TRANSFER':
       return cancelTransferBooking({ bookingId, userId, role });
 
+    case 'RENTAL':
+      return cancelRentalBooking({ bookingId, userId, role });
+
     default:
       throw new Error('Invalid booking type');
   }
@@ -245,6 +298,9 @@ export async function detailedBooking({
 
     case 'TRANSFER':
       return mapTransferBooking(booking);
+
+    case 'RENTAL':
+      return mapRentalBooking(booking);
 
     default:
       throw new Error('Invalid type');

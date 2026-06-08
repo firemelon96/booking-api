@@ -10,6 +10,8 @@ import {
 } from './booking.controller';
 import { adminCreateAccommodationBooking } from '../accommodations/booking/accommodation-booking.controller';
 import { adminCreateTourBooking } from '../tours/booking/tour-booking.controller';
+import { adminCreateRentalBookingController } from '../rentals/bookings/rental-booking.controller';
+import { adminCreateTransferBookingController } from '../transfers/bookings/booking.controller';
 
 const router = Router({ mergeParams: true });
 
@@ -19,6 +21,18 @@ router.post(
   authenticate,
   requireAdmin,
   adminCreateAccommodationBooking,
+);
+router.post(
+  '/rentals',
+  authenticate,
+  requireAdmin,
+  adminCreateRentalBookingController,
+);
+router.post(
+  '/transfers',
+  authenticate,
+  requireAdmin,
+  adminCreateTransferBookingController,
 );
 
 router.get('/', authenticate, listAllBookings);

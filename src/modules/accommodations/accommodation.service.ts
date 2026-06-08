@@ -1,4 +1,5 @@
 import { prisma } from '../../config/prisma';
+import { AccommodationWhereInput } from '../../generated/prisma/models';
 import { slugify } from '../../utils/slugify';
 import {
   findAccommodationBySlug,
@@ -62,7 +63,7 @@ export async function listAccommodation({
   limit = 20,
   sort = 'createdAt:desc',
   search,
-  accommodationType,
+  type,
 }: AccommodationQueryInput) {
   const safePage = Math.max(1, page);
   const safeLimit = Math.min(30, limit);
@@ -74,18 +75,15 @@ export async function listAccommodation({
     [sortField || 'createdAt']: sortOrder === 'asc' ? 'asc' : 'desc',
   };
 
-  const where: any = {};
-
-  if (accommodationType) {
-    where.type = accommodationType;
-  }
-
-  if (search) {
-    where.OR = [
-      { name: { contains: search, mode: 'insensitive' } },
-      { description: { contains: search, mode: 'insensitive' } },
-    ];
-  }
+  const where: AccommodationWhereInput = {
+    ...(type && { type }),
+    ...(search && {
+      OR: [
+        { name: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+      ],
+    }),
+  };
 
   const [data, total] = await prisma.$transaction([
     prisma.accommodation.findMany({
@@ -122,6 +120,7 @@ export async function listAccommodation({
       checkIn: a.checkInTime,
       checkOut: a.checkOutTime,
       hasUnit: a.hasUnits,
+      isBookable: a.isBookable,
       units: a.units.map((u) => ({ id: u.id, name: u.name })),
       amenities: a.amenities,
     })),

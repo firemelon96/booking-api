@@ -11,20 +11,14 @@ export async function adminCreateAccommodationBooking(
   res: Response,
   next: NextFunction,
 ) {
-  const { accommodationId, ...rest } = req.body;
-
   if (!req.user) {
     throw new Error('Unauthorized');
   }
 
-  const userId = userIdSchema.safeParse(req.user.userId);
+  const { accommodationId, ...rest } = req.body;
 
   if (!accommodationId) {
     throw new Error('Invalid accommodation provided');
-  }
-
-  if (!userId.success) {
-    throw new Error('Unauthorized');
   }
 
   const payload = createAccommodationBookingSchema.safeParse(rest);
@@ -36,7 +30,7 @@ export async function adminCreateAccommodationBooking(
   try {
     const createBooking = await createAccommodationBookingService(
       accommodationId,
-      userId.data.userId,
+      req.user.userId,
       req.user.role,
       payload.data,
     );

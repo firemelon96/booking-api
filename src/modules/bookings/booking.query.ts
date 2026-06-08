@@ -37,16 +37,50 @@ export async function findBookingOrThrow({
     },
     include: {
       tourBooking: {
-        select: { tour: true },
+        select: {
+          tour: true,
+          startDate: true,
+          endDate: true,
+          notes: true,
+          participants: true,
+          pricingType: true,
+          schedule: true,
+        },
       },
       accommodationBooking: {
         select: {
-          accommodation: true,
+          accommodation: {
+            select: { hasUnits: true, name: true },
+          },
           unit: true,
+          checkIn: true,
+          checkOut: true,
+          guests: true,
+          nights: true,
+          specialRequests: true,
         },
       },
       transferBooking: {
-        select: { transfer: true },
+        select: {
+          transfer: true,
+          date: true,
+          passengers: true,
+          pickupLocation: true,
+          dropoffLocation: true,
+          pricingType: true,
+          schedule: true,
+        },
+      },
+      rentalBooking: {
+        select: {
+          item: true,
+          startDate: true,
+          endDate: true,
+          pickupLocation: true,
+          returnLocation: true,
+          notes: true,
+          quantity: true,
+        },
       },
     },
   });

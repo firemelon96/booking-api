@@ -10,6 +10,7 @@ import { CreateTourType, TourParams, UpdateTourType } from './tour.type';
 import { attachImages } from './images/images.service';
 import { validateItineraryRules } from './itinerary/itinerary.rule';
 import { validatePricingRules } from './pricing/pricing.rule';
+import { TourWhereInput } from '../../generated/prisma/models';
 
 export async function listTours({
   page = 1,
@@ -30,34 +31,33 @@ export async function listTours({
     [sortField || 'createdAt']: sortOrder === 'asc' ? 'asc' : 'desc',
   };
 
-  const where: any = {};
-
-  if (capacityMode) where.capacityMode = capacityMode;
-  if (duration) where.duration = duration;
-  if (type) where.type = type;
-
-  if (search) {
-    where.OR = [
-      {
-        name: {
-          contains: search,
-          mode: 'insensitive',
+  const where: TourWhereInput = {
+    ...(capacityMode && { capacityMode }),
+    ...(duration && { durationDays: duration }),
+    ...(type && { type }),
+    ...(search && {
+      OR: [
+        {
+          name: {
+            contains: search,
+            mode: 'insensitive',
+          },
         },
-      },
-      {
-        location: {
-          contains: search,
-          mode: 'insensitive',
+        {
+          location: {
+            contains: search,
+            mode: 'insensitive',
+          },
         },
-      },
-      {
-        slug: {
-          contains: search,
-          mode: 'insensitive',
+        {
+          slug: {
+            contains: search,
+            mode: 'insensitive',
+          },
         },
-      },
-    ];
-  }
+      ],
+    }),
+  };
 
   const [data, total] = await prisma.$transaction([
     prisma.tour.findMany({
@@ -75,6 +75,15 @@ export async function listTours({
           select: {
             price: true,
             pricingModel: true,
+            maxGroupSize: true,
+            minGroupSize: true,
+          },
+        },
+        schedules: {
+          select: {
+            label: true,
+            startTIme: true,
+            endTime: true,
           },
         },
       },
@@ -91,7 +100,17 @@ export async function listTours({
       duration: t.durationDays,
       mode: t.capacityMode,
       tourType: t.type,
-      startsAt: `${t.pricing[0].price} ${t.pricing[0].pricingModel}`,
+      pricing: t.pricing.map((p) => ({
+        price: p.price,
+        type: p.pricingModel,
+        min: p.minGroupSize,
+        max: p.maxGroupSize,
+      })),
+      schedules: t.schedules.map((s) => ({
+        start: s.startTIme,
+        end: s.endTime,
+        label: s.label,
+      })),
       numberOfLikes: t._count,
     })),
     meta: {

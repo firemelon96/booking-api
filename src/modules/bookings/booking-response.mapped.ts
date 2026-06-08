@@ -6,14 +6,13 @@ export function mapTourBooking(booking: any) {
     bookingStatus: booking.bookingStatus,
     paymentStatus: booking.paymentStatus,
     totalPrice: booking.totalPrice,
-    createdAt: booking.createdAt,
     payment: booking.payment,
     details: {
+      name: booking.tourBooking?.tour.name,
       participants: booking.tourBooking?.participants,
       pricingType: booking.tourBooking?.pricingType,
       startDate: booking.tourBooking?.startDate,
       endDate: booking.tourBooking?.endDate,
-      tour: booking.tourBooking?.tour,
     },
   };
 }
@@ -34,8 +33,8 @@ export function mapAccommodationBooking(booking: any) {
       nights: booking.accommodationBooking?.nights,
       guests: booking.accommodationBooking?.guests,
       units: booking.accommodationBooking?.units,
-      accommodation: booking.accommodationBooking?.accommodation,
-      unit: booking.accommodationBooking?.unit,
+      name: `${booking.accommodationBooking?.accommodation.name} ${booking.accommodationBooking?.accommodation.hasUnits ? booking.accommodationBooking?.unit.name : ''}`,
+      request: booking.accommodationBooking?.specialRequest,
     },
   };
 }
@@ -51,12 +50,12 @@ export async function mapTransferBooking(booking: any) {
     createdAt: booking.createdAt,
     payment: booking.payment,
     details: {
-      date: booking.transferBooking?.date,
+      name: booking.transferBooking?.transfer.name,
+      travelDate: booking.transferBooking?.date,
       passengers: booking.transferBooking?.passengers,
       pricingType: booking.transferBooking?.pricingType,
       pickupLocation: booking.transferBooking?.pickupLocation,
       dropoffLocation: booking.transferBooking?.dropoffLocation,
-      transfer: booking.transferBooking?.transfer,
       scheduleId: booking.transferBooking?.scheduleId,
     },
   };
@@ -76,7 +75,11 @@ export async function mapRentalBooking(booking: any) {
       startDate: booking.rentalBooking?.startDate,
       endDate: booking.rentalBooking?.endDate,
       guests: booking.rentalBooking?.guests,
-      rental: booking.rentalBooking?.rental,
+      name: booking.rentalBooking?.item.name,
+      pickupLocation: booking.rentalBooking?.pickupLocation,
+      returnLocation: booking.rentalBooking?.returnLocation,
+      notes: booking.rentalBooking?.notes,
+      quantity: booking.rentalBooking?.quantity,
     },
   };
 }

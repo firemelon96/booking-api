@@ -12,8 +12,6 @@ import {
   getBookingByReference,
   rescheduleBooking,
 } from './booking.service';
-import { createTourBooking } from '../tours/booking/tour-booking.service';
-import { createTourBookingSchema } from '../tours/booking/tour-booking-validator';
 
 export async function listAllBookings(
   req: Request,

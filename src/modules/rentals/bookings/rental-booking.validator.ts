@@ -10,3 +10,8 @@ export const createRentalBookingSchema = z.object({
   returnLocation: z.string().optional(),
   notes: z.string().optional(),
 });
+
+export const rescheduleRentalBookingSchema = z.object({
+  startDate: z.coerce.date(),
+  endDate: z.coerce.date(),
+});

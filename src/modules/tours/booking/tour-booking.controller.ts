@@ -53,7 +53,6 @@ export async function adminCreateTourBooking(
     throw new Error('Tour id must be provided');
   }
 
-  //should accept both tour and accoms
   const payload = createTourBookingSchema.safeParse(rest);
 
   if (!payload.success) {

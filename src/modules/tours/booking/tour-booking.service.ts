@@ -45,6 +45,8 @@ export async function createTourBooking(
     scheduleId,
   }: TourBookingCreateInput,
 ) {
+  const isAdmin = role === 'ADMIN';
+
   const interval = normalizeInterval(startDate, endDate);
   const tour = await findTourOrFail(tourId);
 
@@ -102,9 +104,13 @@ export async function createTourBooking(
         reference,
         type: 'TOUR',
         userId,
-        totalPrice: totalPrice,
-        isAdminOverride: role === 'ADMIN',
+        totalPrice,
+        isAdminOverride: isAdmin,
         expiresAt,
+        bookingStatus: isAdmin ? 'CONFIRMED' : 'PENDING',
+        paymentStatus: isAdmin ? 'PAID' : 'PENDING',
+        paidAmount: isAdmin ? totalPrice : 0,
+        remainingBalance: isAdmin ? 0 : totalPrice,
       },
     });
 
