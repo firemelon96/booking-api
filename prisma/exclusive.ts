@@ -5,12 +5,12 @@ import {
   PricingType,
 } from '../src/generated/prisma/enums';
 
-export async function seedMixed(userId: string) {
+export async function seedExclusive(userId: string) {
   return prisma.$transaction(async (tx) => {
     const tour = await tx.tour.create({
       data: {
-        name: '3D2N Puerto Princesa Tour',
-        slug: '3d2n-puerto-princesa-tour',
+        name: 'Private puerto princesa tour',
+        slug: 'private-puerto-princesa-tour',
         description:
           'Experience the beauty of Honda Bay with our exciting day tour, perfect for nature lovers and adventure seekers. Explore pristine beaches, vibrant coral reefs, and diverse marine life in this unforgettable island-hopping adventure.',
         durationDays: 3,
@@ -39,14 +39,6 @@ export async function seedMixed(userId: string) {
 
     await tx.tourPricing.createMany({
       data: [
-        {
-          tourId: tour.id,
-          pricingType: PricingType.JOINER,
-          minGroupSize: 1,
-          maxGroupSize: 12,
-          price: 1500,
-          pricingModel: PricingModel.PER_PERSON,
-        },
         {
           tourId: tour.id,
           pricingType: PricingType.PRIVATE,

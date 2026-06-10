@@ -210,6 +210,9 @@ model  ServiceLike {
   accommodationId String?
   accommodation Accommodation? @relation(fields: [accommodationId], references: [id], onDelete: Cascade)
 
+  rentalItemId String?
+  item RentalItem? @relation(fields: [rentalItemId] , references: [id], onDelete: Cascade)
+
   createdAt   DateTime @default(now())
 
   @@unique([userId, serviceType])
@@ -988,6 +991,8 @@ model RentalItem {
   bookings RentalBooking[]
 
   rentalItemImages RentalItemImage[]
+
+  likes ServiceLike[]
 
   @@unique([rentalId, itemCode])
   @@index([rentalId])

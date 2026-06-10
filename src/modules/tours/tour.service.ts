@@ -86,6 +86,35 @@ export async function listTours({
             endTime: true,
           },
         },
+        exclusions: {
+          select: {
+            title: true,
+            description: true,
+          },
+        },
+        inclusions: {
+          select: {
+            title: true,
+            description: true,
+          },
+        },
+        itinerary: {
+          select: {
+            days: {
+              select: {
+                dayNumber: true,
+                title: true,
+                items: true,
+              },
+            },
+          },
+        },
+        images: {
+          select: {
+            isFeatured: true,
+            publicId: true,
+          },
+        },
       },
     }),
     prisma.tour.count({ where }),
@@ -111,6 +140,24 @@ export async function listTours({
         end: s.endTime,
         label: s.label,
       })),
+      inclusions: t.inclusions.map((i) => ({
+        title: i.title,
+        description: i.description,
+      })),
+      exclusions: t.exclusions.map((e) => ({
+        title: e.title,
+        description: e.description,
+      })),
+      itinerary: t.itinerary?.days.map((d) => ({
+        day: d.dayNumber,
+        title: d.title,
+        items: d.items.map((i) => ({
+          title: i.title,
+          time: i.time,
+          description: i.description,
+          order: i.order,
+        })),
+      })),
       numberOfLikes: t._count,
     })),
     meta: {
@@ -127,7 +174,66 @@ export async function getTourBySlug(slug: string) {
     where: {
       slug,
     },
-    include: { pricing: true, itinerary: { include: { days: true } } },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      slug: true,
+      capacityMode: true,
+      durationDays: true,
+      type: true,
+      timezone: true,
+      location: true,
+      itinerary: {
+        select: {
+          days: {
+            select: {
+              dayNumber: true,
+              title: true,
+              items: {
+                select: {
+                  title: true,
+                  time: true,
+                  description: true,
+                  order: true,
+                },
+              },
+            },
+          },
+        },
+      },
+      inclusions: {
+        select: {
+          title: true,
+          description: true,
+          sortOrder: true,
+        },
+      },
+      exclusions: {
+        select: {
+          title: true,
+          description: true,
+          sortOrder: true,
+        },
+      },
+      schedules: {
+        select: {
+          label: true,
+          startTIme: true,
+          endTime: true,
+          capacity: true,
+        },
+      },
+      pricing: {
+        select: {
+          pricingType: true,
+          pricingModel: true,
+          minGroupSize: true,
+          maxGroupSize: true,
+          price: true,
+        },
+      },
+    },
   });
 
   if (!tour) throw new Error('Tour slug not found');
@@ -135,7 +241,11 @@ export async function getTourBySlug(slug: string) {
   return tour;
 }
 
-export async function createFullTour(data: CreateTourType) {
+export async function createFullTour({
+  inclusions,
+  exclusions,
+  ...data
+}: CreateTourType) {
   validateItineraryRules(data.type, data.itinerary, data.durationDays!);
   validatePricingRules(data.capacityMode, data.pricing);
 
@@ -158,6 +268,25 @@ export async function createFullTour(data: CreateTourType) {
         joinerCapacity: data.joinerCapacity,
       },
     });
+
+    if (inclusions.length > 0) {
+      await tx.tourInclusion.createMany({
+        data: inclusions.map((item) => ({
+          ...item,
+          tourId: tour.id,
+        })),
+      });
+    }
+
+    if (exclusions.length > 0) {
+      await tx.tourExclusion.createMany({
+        data: exclusions.map((item) => ({
+          ...item,
+          tourId: tour.id,
+        })),
+        skipDuplicates: true,
+      });
+    }
 
     //create itineraries
     await createItinerary(tx, tour.id, data.itinerary);
@@ -191,13 +320,13 @@ export async function updateBaseTour(id: string, data: UpdateTourType) {
 
   validateBaseTourRules(baseValidationInput);
 
-  const updateData = Object.fromEntries(
-    Object.entries({ ...data, slug }).filter(
-      ([_, value]) => value !== undefined,
-    ),
-  );
-
-  return prisma.tour.update({ where: { id }, data: updateData });
+  return prisma.tour.update({
+    where: { id },
+    data: {
+      ...data,
+      slug,
+    },
+  });
 }
 
 export async function deleteTour(id: string) {

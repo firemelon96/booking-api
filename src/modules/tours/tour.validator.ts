@@ -3,6 +3,16 @@ import { CapacityMode, TourType } from '../../generated/prisma/enums';
 import { daysSchema } from './itinerary/itinerary.validator';
 import { createTourPricingSchema } from './pricing/pricing.validator';
 
+export const inclusionSchema = z.object({
+  title: z.string(),
+  description: z.string().optional(),
+});
+
+export const exclusionSchema = z.object({
+  title: z.string(),
+  description: z.string().optional(),
+});
+
 export const createFullTourSchema = z.object({
   name: z.string().min(2).max(120),
   description: z.string().min(20).max(200),
@@ -10,13 +20,13 @@ export const createFullTourSchema = z.object({
   type: z.enum(TourType),
   capacityMode: z.enum(CapacityMode),
   location: z.string(),
-  // inclusions: z.string().array(),
-  // exclusions: z.string().array(),
   imageIds: z.string().array(),
   itinerary: daysSchema,
   pricing: createTourPricingSchema.array(),
   joinerCapacity: z.number().optional(),
   ownerId: z.string(),
+  inclusions: inclusionSchema.array(),
+  exclusions: exclusionSchema.array(),
 });
 
 export const updatePartialTourSchema = z
@@ -27,8 +37,6 @@ export const updatePartialTourSchema = z
     type: z.enum(TourType),
     capacityMode: z.enum(CapacityMode),
     location: z.string(),
-    inclusions: z.string().array(),
-    exclusions: z.string().array(),
   })
   .partial();
 

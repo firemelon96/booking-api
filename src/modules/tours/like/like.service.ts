@@ -7,10 +7,11 @@ export async function likedTour({
   tourId: string;
   userId: string;
 }) {
-  return prisma.tourLike.create({
+  return prisma.serviceLike.create({
     data: {
       userId,
       tourId,
+      serviceType: 'TOUR',
     },
   });
 }
@@ -22,12 +23,13 @@ export async function unlikeTour({
   tourId: string;
   userId: string;
 }) {
-  return prisma.tourLike.delete({
+  return prisma.serviceLike.delete({
     where: {
-      userId_tourId: {
-        tourId,
+      userId_serviceType: {
         userId,
+        serviceType: 'TOUR',
       },
+      tourId,
     },
   });
 }
