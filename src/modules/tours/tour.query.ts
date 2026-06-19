@@ -58,6 +58,7 @@ export async function getTourIdBySlug(slug: string) {
     select: {
       id: true,
       joinerCapacity: true,
+      hasSchedule: true,
     },
   });
 

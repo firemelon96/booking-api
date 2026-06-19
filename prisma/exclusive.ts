@@ -14,7 +14,7 @@ export async function seedExclusive(userId: string) {
         description:
           'Experience the beauty of Honda Bay with our exciting day tour, perfect for nature lovers and adventure seekers. Explore pristine beaches, vibrant coral reefs, and diverse marine life in this unforgettable island-hopping adventure.',
         durationDays: 3,
-        capacityMode: CapacityMode.MIXED,
+        capacityMode: CapacityMode.EXCLUSIVE,
         location: 'Puerto Princesa, Palawan',
         type: 'PACKAGE',
         ownerId: userId,

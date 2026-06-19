@@ -13,6 +13,13 @@ export const exclusionSchema = z.object({
   description: z.string().optional(),
 });
 
+const scheduleSchema = z.object({
+  label: z.string(),
+  startTime: z.string().optional(),
+  endTime: z.string().optional(),
+  maxParticipants: z.number().optional(),
+});
+
 export const createFullTourSchema = z.object({
   name: z.string().min(2).max(120),
   description: z.string().min(20).max(200),
@@ -25,8 +32,10 @@ export const createFullTourSchema = z.object({
   pricing: createTourPricingSchema.array(),
   joinerCapacity: z.number().optional(),
   ownerId: z.string(),
+  hasSchedule: z.boolean().optional(),
   inclusions: inclusionSchema.array(),
   exclusions: exclusionSchema.array(),
+  schedules: scheduleSchema.array(),
 });
 
 export const updatePartialTourSchema = z
@@ -37,6 +46,7 @@ export const updatePartialTourSchema = z
     type: z.enum(TourType),
     capacityMode: z.enum(CapacityMode),
     location: z.string(),
+    schedules: scheduleSchema.array(),
   })
   .partial();
 
@@ -53,5 +63,5 @@ export const tourParamsSchema = z.object({
 });
 
 export const tourIdParams = z.object({
-  tourId: z.uuid(),
+  tourId: z.string(),
 });

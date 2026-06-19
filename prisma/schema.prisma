@@ -129,13 +129,15 @@ model Tour {
   ownerId String
   owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
-  description  String
+  description  String?
   highlights   String[]
   location     String
   durationDays Int? //For day tours, this will be 1 day. For package tours, this will be the total duration of the tour in days.
   capacityMode CapacityMode @default(MIXED)
   type         TourType     @default(DAY)
   timezone     String       @default("Asia/Manila")
+
+  hasSchedule Boolean @default(false) //type day
 
   schedules          TourScheduleOption[] //For package tours, this will be empty and the schedule will be determined by the itinerary.
 
@@ -242,8 +244,8 @@ model TourDailyCapacity {
   id String @id @default(uuid())
 
   date     DateTime
-  capacity Int
-  booked   Int      @default(0) // current used slots
+  availableSlots Int
+  bookedSlots   Int      @default(0) // current used slots
 
   scheduleId String?
   schedule   TourScheduleOption? @relation(fields: [scheduleId], references: [id])
@@ -272,7 +274,7 @@ model TourScheduleOption {
   startTIme String?
   endTime   String?
 
-  capacity Int?
+  maxParticipants Int?
 
   capacities TourDailyCapacity[]
   tourBookings TourBooking[]

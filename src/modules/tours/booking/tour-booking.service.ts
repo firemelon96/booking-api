@@ -1,6 +1,7 @@
 import { eachDayOfInterval } from 'date-fns';
 import { normalizeInterval } from '../../../utils/helper';
 import {
+  BOOKING_RULES,
   validateBookingRules,
   validateCancelRules,
   validateRescheduleRules,
@@ -47,10 +48,13 @@ export async function createTourBooking(
 ) {
   const isAdmin = role === 'ADMIN';
 
-  const interval = normalizeInterval(startDate, endDate);
   const tour = await findTourOrFail(tourId);
 
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes from now
+
+  const interval = normalizeInterval(startDate, endDate);
+
+  const dates = eachDayOfInterval(interval);
 
   validateBookingRules({
     scheduleId: scheduleId ?? null,
@@ -60,35 +64,35 @@ export async function createTourBooking(
     interval,
   });
 
-  const dates = eachDayOfInterval(interval);
+  const capacity =
+    pricingType === 'PRIVATE' ? participants : tour.joinerCapacity;
 
   return prisma.$transaction(async (tx) => {
     const reference = await createUniqueBookingReference(tx);
 
     await checkAvailability({ tx, tourId, dates, role, userId });
 
-    await lockCapacityRows(tx, {
-      tourId,
-      dates,
-      scheduleKey: scheduleId ?? 'NO_SCHEDULE',
-    });
-
-    const capacityContext = await prepareCapacity({
+    await prepareCapacity({
       tx,
       tourId,
-      scheduleId: scheduleId ?? null,
-      joinerCapacity: tour.joinerCapacity,
+      scheduleId,
+      capacity,
       dates,
     });
 
-    const { hasOverbooking } = await reserveCapacity({
+    const rows = await lockCapacityRows(tx, {
+      tourId,
+      dates,
+      scheduleId,
+    });
+
+    const { hasAdminOverride, hasOverbooking } = await reserveCapacity({
       tx,
+      rows,
       capacityMode: tour.capacityMode,
-      dates,
       participants,
-      ctx: capacityContext,
       pricingType,
-      role,
+      isAdmin,
       userId,
     });
 
@@ -105,7 +109,7 @@ export async function createTourBooking(
         type: 'TOUR',
         userId,
         totalPrice,
-        isAdminOverride: isAdmin,
+        isAdminOverride: hasAdminOverride,
         expiresAt,
         bookingStatus: isAdmin ? 'CONFIRMED' : 'PENDING',
         paymentStatus: isAdmin ? 'PAID' : 'PENDING',
@@ -172,9 +176,10 @@ export async function rescheduleTourBooking(
   bookingId: string,
   userId: string,
   role: Role,
-  payload: TourReschedPayload,
+  { newEndDate, newStartDate, scheduleId }: TourReschedPayload,
 ) {
-  const { newStartDate, newEndDate, scheduleId } = payload;
+  const isAdmin = role === 'ADMIN';
+
   const tourBooking = await findTourBookingOrThrow({
     bookingId,
     role,
@@ -183,10 +188,8 @@ export async function rescheduleTourBooking(
 
   const newInterval = normalizeInterval(newStartDate, newEndDate);
 
-  const { datesToRelease, datesToReserve } = validateRescheduleRules(
-    tourBooking,
-    newInterval,
-  );
+  const { datesToRelease, datesToReserve, oldScheduleId } =
+    validateRescheduleRules(tourBooking, newInterval);
 
   return prisma.$transaction(async (tx) => {
     await checkAvailability({
@@ -200,40 +203,39 @@ export async function rescheduleTourBooking(
     await lockCapacityRows(tx, {
       tourId: tourBooking.tourId,
       dates: datesToRelease,
-      scheduleKey: scheduleId ?? 'NO_SCHEDULE',
+      scheduleId: oldScheduleId,
     });
 
     await releaseCapacity({
       tx,
       dates: datesToRelease,
       participants: tourBooking.participants,
+      scheduleId: oldScheduleId,
+      tourId: tourBooking.tourId,
+    });
+
+    await prepareCapacity({
+      tx,
       scheduleId,
+      dates: datesToReserve,
+      tourId: tourBooking.tourId,
+      capacity: tourBooking.participants,
+    });
+
+    const rows = await lockCapacityRows(tx, {
+      scheduleId,
+      dates: datesToReserve,
       tourId: tourBooking.tourId,
     });
 
-    const capacityContext = await prepareCapacity({
+    const { hasAdminOverride, hasOverbooking } = await reserveCapacity({
       tx,
-      tourId: tourBooking.tourId,
-      scheduleId: scheduleId ?? null,
-      joinerCapacity: tourBooking.tour.joinerCapacity ?? 0,
-      dates: datesToReserve,
-    });
-
-    await lockCapacityRows(tx, {
-      tourId: tourBooking.tourId,
-      dates: datesToReserve,
-      scheduleKey: scheduleId ?? 'NO_SCHEDULE',
-    });
-
-    const { hasOverbooking } = await reserveCapacity({
-      tx,
-      capacityMode: tourBooking.tour.capacityMode,
-      dates: datesToReserve,
-      participants: tourBooking.participants,
-      ctx: capacityContext,
-      pricingType: tourBooking.pricingType,
-      role,
       userId,
+      isAdmin,
+      rows,
+      pricingType: tourBooking.pricingType,
+      participants: tourBooking.participants,
+      capacityMode: tourBooking.tour.capacityMode,
     });
 
     const resched = await tx.booking.update({
@@ -242,7 +244,7 @@ export async function rescheduleTourBooking(
         type: 'TOUR',
         rescheduleCount: { increment: 1 },
         lastRescheduleDate: new Date(),
-        isAdminOverride: role === 'ADMIN',
+        isAdminOverride: hasAdminOverride,
       },
     });
 
@@ -252,7 +254,7 @@ export async function rescheduleTourBooking(
         startDate: newInterval.start,
         endDate: newInterval.end,
         isOverbooked: hasOverbooking,
-        scheduleId: scheduleId ?? null,
+        scheduleId,
       },
     });
 
@@ -296,10 +298,6 @@ export async function cancelTourbooking({
     const policy = await tx.cancellationPolicy.findUnique({
       where: { tourId: tourBooking.tourId },
     });
-
-    if (!policy) {
-      throw new Error('Policy not found');
-    }
 
     const { refundAmount, refundPercentage, refundType } =
       calculateCancellationRefund({

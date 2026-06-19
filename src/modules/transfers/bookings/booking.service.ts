@@ -53,7 +53,7 @@ export async function createTransferBookingService(
 
   if (transfer.hasSchedule) {
     if (!scheduleId) {
-      throw new Error('Schedule is required for joiner booking.');
+      throw new Error('Schedule is required for this transfer.');
     }
 
     selectedSchedule = transfer.schedules.find(
@@ -75,6 +75,10 @@ export async function createTransferBookingService(
 
   if (!selectedPricing) {
     throw new Error('Transfer pricing not found');
+  }
+
+  if (passengers > selectedPricing.maxPassengers) {
+    throw new Error('Cannot exceed the maximum passenger');
   }
 
   const maxPassengers = selectedSchedule

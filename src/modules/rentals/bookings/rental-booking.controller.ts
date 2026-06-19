@@ -58,7 +58,7 @@ export async function createRentalBookingController(
   const payload = createRentalBookingSchema.safeParse(req.body);
 
   if (!payload.success) {
-    throw new Error('Invalid booking body');
+    throw new Error('Invalid booking fields');
   }
   try {
     const created = await createRentalBookingService(

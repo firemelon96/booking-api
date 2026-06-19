@@ -1,6 +1,52 @@
-import { startOfDay } from 'date-fns';
+import { eachDayOfInterval, startOfDay } from 'date-fns';
 import { PricingType, Prisma } from '../../../generated/prisma/client';
 import { logAdminWarning } from '../../logs/admin-warning.service';
+import { SetInventoryInput } from './inventory.type';
+import { prisma } from '../../../config/prisma';
+import { normalizeInterval } from '../../../utils/helper';
+import { findTransferOrThrow } from '../transfer.query';
+
+// export async function setInventoryService(
+//   transferId: string,
+//   { endDate, inventory, startDate, scheduleId }: SetInventoryInput,
+// ) {
+//   const transfer = await findTransferOrThrow(transferId);
+
+//   let selectedSchedule = transfer.hasSchedule
+//     ? transfer.schedules.find((s) => s.id === scheduleId)
+//     : null;
+
+//   const interval = normalizeInterval(startDate, endDate);
+
+//   const dates = eachDayOfInterval(interval);
+
+//   return prisma.$transaction(async (tx) => {
+//     for (const date of dates) {
+//       await ensureTransferInventory(tx, {
+//         transferId,
+//         travelDate: date,
+//         maxPassengers: inventory,
+//         scheduleId: selectedSchedule?.id,
+//       });
+
+//       await lockTransferInventory(tx, {
+//         transferId,
+//         travelDate: date,
+//         scheduleId: selectedSchedule?.id,
+//       });
+
+//       await tx.transferInventory.update({
+//         where: {
+//           transferId,
+//           date,
+//         },
+//         data: {
+//           availableSeats: inventory,
+//         },
+//       });
+//     }
+//   });
+// }
 
 export async function ensureTransferInventory(
   tx: Prisma.TransactionClient,

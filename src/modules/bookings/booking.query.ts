@@ -92,6 +92,20 @@ export async function findBookingOrThrow({
   return booking;
 }
 
+export async function findBookingById(bookingId: string) {
+  const booking = await prisma.booking.findFirst({
+    where: {
+      id: bookingId,
+    },
+  });
+
+  if (!booking) {
+    throw new Error('Booking Not found');
+  }
+
+  return booking;
+}
+
 export async function findTourBookingOrThrow({
   bookingId,
   userId,
@@ -122,7 +136,7 @@ export function calculateCancellationRefund({
   bookingDate: Date;
   startDate: Date;
   totalPrice: number;
-  policy: any;
+  policy?: CancellationPolicy | null;
 }): {
   refundType: CancellationRefundType;
   refundAmount: number;
@@ -133,6 +147,14 @@ export function calculateCancellationRefund({
   const diffMs = startDate.getTime() - now.getTime();
 
   const hoursBeforeTour = diffMs / (1000 * 60 * 60);
+
+  if (!policy) {
+    return {
+      refundAmount: totalPrice,
+      refundPercentage: 100,
+      refundType: 'FULL',
+    };
+  }
 
   if (hoursBeforeTour >= policy.fullRefundHours) {
     return {

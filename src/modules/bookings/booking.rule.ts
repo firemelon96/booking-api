@@ -66,14 +66,13 @@ export function validateRescheduleRules(
   newInterval: { start: Date; end: Date },
   scheduleId?: string | null,
 ) {
-  if (
-    tourBooking.booking.bookingStatus === 'CANCELLED' ||
-    tourBooking.booking.bookingStatus === 'EXPIRED'
-  ) {
+  if (tourBooking.booking.bookingStatus === 'CONFIRMED') {
     throw new Error('Cannot reschedule this booking');
   }
 
-  if (tourBooking.scheduleId && !scheduleId) {
+  const oldScheduleId = tourBooking.scheduleId ?? null;
+
+  if (oldScheduleId && !scheduleId) {
     throw new Error('Schedule is required');
   }
 
@@ -126,7 +125,7 @@ export function validateRescheduleRules(
     throw new Error(`Maximum reschedule reached.`);
   }
 
-  return { datesToRelease, datesToReserve };
+  return { datesToRelease, datesToReserve, oldScheduleId };
 }
 
 export function validateCancelRules({

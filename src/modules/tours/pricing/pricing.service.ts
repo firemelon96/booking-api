@@ -19,11 +19,6 @@ export async function createPricing(
 
 export async function modifyPricing(tourId: string, pricing: PricingType[]) {
   const tour = await findTourOrFail(tourId);
-  // const tour = await prisma.tour.findUnique({ where: { id: tourId } });
-
-  // if (!tour) {
-  //   throw new Error('Tour not found');
-  // }
 
   validatePricingRules(tour.capacityMode, pricing);
 

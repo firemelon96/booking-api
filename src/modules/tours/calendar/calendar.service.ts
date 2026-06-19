@@ -11,23 +11,30 @@ export async function calendarAvailability({
 }: CalendarQueryType & { slug: string }) {
   const tour = await getTourIdBySlug(slug);
 
-  const scheduleKey = getScheduleKey(scheduleId);
   const { start, end } = getMonthRange(month);
 
   const days = eachDayOfInterval({ start, end });
+
+  if (tour.hasSchedule && !scheduleId) {
+    throw new Error('Schedule must be selected');
+  }
+
+  if (!tour.hasSchedule && scheduleId) {
+    throw new Error('Schedule not required');
+  }
 
   return prisma.$transaction(async (tx) => {
     //capacity source of truth
     const capacities = await tx.tourDailyCapacity.findMany({
       where: {
         tourId: tour.id,
-        scheduleKey,
+        scheduleId,
         date: { gte: start, lte: end },
       },
       select: {
         date: true,
-        capacity: true,
-        booked: true,
+        availableSlots: true,
+        bookedSlots: true,
       },
     });
 
@@ -53,7 +60,7 @@ export async function calendarAvailability({
     );
 
     //build response
-    const results = days.map((day) => {
+    return days.map((day) => {
       const key = startOfDay(day).getTime();
 
       const capacityRow = capacityMap.get(key);
@@ -69,7 +76,6 @@ export async function calendarAvailability({
         return {
           date: day.toISOString().slice(0, 10),
           status,
-          available: false,
           remainingSlots: null,
           capacity: 0,
           booked: 0,
@@ -77,36 +83,27 @@ export async function calendarAvailability({
       }
 
       if (capacityRow) {
-        capacity = capacityRow.capacity;
-        booked = capacityRow.booked;
+        if (capacityRow.bookedSlots >= capacityRow.availableSlots) {
+          status = 'FULL';
+          capacity = capacityRow.availableSlots;
+          booked = capacityRow.bookedSlots;
+        } else {
+          status = 'AVAILABLE';
+          capacity = capacityRow.availableSlots;
+          booked = capacityRow.bookedSlots;
+          remainingSlots = capacityRow.availableSlots - capacityRow.bookedSlots;
+        }
       } else {
-        capacity = tour.joinerCapacity ?? 0;
-        booked = 0;
-      }
-
-      if (capacity === 0) {
         status = 'NO_CAPACITY';
-      } else if (booked >= capacity) {
-        status = 'FULL';
-        remainingSlots = 0;
-      } else {
-        status = 'AVAILABLE';
-        remainingSlots = capacity - booked;
       }
 
       return {
         date: day.toISOString().slice(0, 10),
         status,
-        available: status === 'AVAILABLE',
         remainingSlots: remainingSlots,
         capacity,
         booked,
       };
     });
-
-    return {
-      month,
-      days: results,
-    };
   });
 }

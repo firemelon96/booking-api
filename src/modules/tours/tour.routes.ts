@@ -37,9 +37,9 @@ router.use('/:tourId/images', imageRoutes);
 router.use('/:tourId/capacity', capacityRoutes);
 router.use('/:tourId/availability', availabilityRoutes);
 router.use('/:tourId/cancellation-policy', cancellationPolicyRoutes);
-router.use('/:tourId/like', likeRoutes);
 
 //auth user
+router.use('/:tourId/like', likeRoutes);
 router.use('/:tourId/booking', tourBookingRoutes);
 
 export default router;

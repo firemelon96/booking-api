@@ -1,7 +1,7 @@
 import { prisma } from '../../../config/prisma';
 import { PaymentStatus, Prisma } from '../../../generated/prisma/client';
 import { createXenditInvoice } from '../../webhooks/xendit/xendit.service';
-import { findBookingOrThrow } from '../booking.query';
+import { findBookingById, findBookingOrThrow } from '../booking.query';
 import {
   CreateInitialPaymentTransaction,
   CreatePaymentTransationParams,
@@ -67,11 +67,11 @@ export async function updateBookingPaymentSummary(
   tx: Prisma.TransactionClient,
   bookingId: string,
 ) {
-  const booking = await findBookingOrThrow({ bookingId });
+  const booking = await findBookingById(bookingId);
 
   const transactions = await tx.paymentTransation.findMany({
     where: {
-      bookingId,
+      bookingId: booking.id,
       paymentStatus: {
         in: ['PAID', 'PARTIALLY_REFUNDED'],
       },

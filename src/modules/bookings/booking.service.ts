@@ -59,7 +59,7 @@ export async function getAllBookingsService(
   };
 
   const where: BookingWhereInput = {
-    ...(userId && { userId }),
+    ...(role === 'USER' && { userId }),
     ...(bookingStatus && { bookingStatus }),
     ...(paymentStatus && { paymentStatus }),
     ...(reference && { reference }),

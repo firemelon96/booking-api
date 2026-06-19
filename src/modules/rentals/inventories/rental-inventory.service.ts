@@ -87,7 +87,7 @@ export async function reserveRentalInventory(
 
     if (remaining < quantity) {
       if (!isAdmin) {
-        throw new Error('Item is fully booked');
+        throw new Error('Item is not available');
       }
 
       hasAdminOverride = true;

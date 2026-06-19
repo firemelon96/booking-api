@@ -77,10 +77,12 @@ export async function listTours({
             pricingModel: true,
             maxGroupSize: true,
             minGroupSize: true,
+            pricingType: true,
           },
         },
         schedules: {
           select: {
+            id: true,
             label: true,
             startTIme: true,
             endTime: true,
@@ -131,11 +133,13 @@ export async function listTours({
       tourType: t.type,
       pricing: t.pricing.map((p) => ({
         price: p.price,
-        type: p.pricingModel,
+        mode: p.pricingModel,
+        type: p.pricingType,
         min: p.minGroupSize,
         max: p.maxGroupSize,
       })),
       schedules: t.schedules.map((s) => ({
+        id: s.id,
         start: s.startTIme,
         end: s.endTime,
         label: s.label,
@@ -244,6 +248,7 @@ export async function getTourBySlug(slug: string) {
 export async function createFullTour({
   inclusions,
   exclusions,
+  schedules,
   ...data
 }: CreateTourType) {
   validateItineraryRules(data.type, data.itinerary, data.durationDays!);
@@ -252,6 +257,14 @@ export async function createFullTour({
   const slug = slugify(data.name);
 
   await existingTourSlug(slug);
+
+  if (data.hasSchedule && !schedules.length) {
+    throw new Error('Schedules is required');
+  }
+
+  if (!data.hasSchedule && schedules.length > 0) {
+    throw new Error('Schedule is not required');
+  }
 
   return prisma.$transaction(async (tx) => {
     //create tour
@@ -288,6 +301,15 @@ export async function createFullTour({
       });
     }
 
+    if (schedules.length > 0) {
+      await tx.tourScheduleOption.createMany({
+        data: schedules.map((schedule) => ({
+          tourId: tour.id,
+          ...schedule,
+        })),
+      });
+    }
+
     //create itineraries
     await createItinerary(tx, tour.id, data.itinerary);
     //Create pricing
@@ -299,8 +321,15 @@ export async function createFullTour({
   });
 }
 
-export async function updateBaseTour(id: string, data: UpdateTourType) {
+export async function updateBaseTour(
+  id: string,
+  { schedules, ...data }: UpdateTourType,
+) {
   const existing = await findTourOrFail(id);
+
+  if (existing.hasSchedule && !schedules?.length) {
+    throw new Error('Schedule is required');
+  }
 
   let slug = existing.slug;
 
@@ -320,12 +349,30 @@ export async function updateBaseTour(id: string, data: UpdateTourType) {
 
   validateBaseTourRules(baseValidationInput);
 
-  return prisma.tour.update({
-    where: { id },
-    data: {
-      ...data,
-      slug,
-    },
+  return prisma.$transaction(async (tx) => {
+    const tour = await tx.tour.update({
+      where: { id },
+      data: {
+        ...data,
+        slug,
+      },
+    });
+
+    if (schedules && schedules.length > 0) {
+      await tx.tourScheduleOption.deleteMany({
+        where: { tourId: tour.id },
+      });
+
+      await tx.tourScheduleOption.createMany({
+        data: schedules.map((schedule) => ({
+          tourId: tour.id,
+          label: schedule.label,
+          startTime: schedule.startTime,
+          endTime: schedule.endTime,
+          capacity: schedule.maxParticipants,
+        })),
+      });
+    }
   });
 }
 
@@ -338,5 +385,5 @@ export async function deleteTour(id: string) {
 
   await Promise.all(deletePromises);
 
-  return prisma.tour.delete({ where: { id } });
+  return prisma.tour.delete({ where: { id: existing.id } });
 }

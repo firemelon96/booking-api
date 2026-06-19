@@ -10,16 +10,34 @@ export async function seedShared(userId: string) {
   return prisma.$transaction(async (tx) => {
     const tour = await tx.tour.create({
       data: {
-        name: 'Talaudyong shared day tour',
-        slug: 'talaudyong-shared-day-tour',
+        name: 'Puerto Princesa City Tour',
+        slug: 'puerto-princesa-city-tour',
         description:
           'Experience the beauty of Honda Bay with our exciting day tour, perfect for nature lovers and adventure seekers. Explore pristine beaches, vibrant coral reefs, and diverse marine life in this unforgettable island-hopping adventure.',
         durationDays: 1,
-        capacityMode: CapacityMode.MIXED,
+        capacityMode: CapacityMode.SHARED,
         location: 'Puerto Princesa, Palawan',
         type: TourType.DAY,
         ownerId: userId,
+        hasSchedule: true,
       },
+    });
+
+    await tx.tourScheduleOption.createMany({
+      data: [
+        {
+          tourId: tour.id,
+          label: 'Morning',
+          startTIme: '5:00 AM',
+          endTime: '12:00 PM',
+        },
+        {
+          tourId: tour.id,
+          label: 'Afternoon',
+          startTIme: '1:00 PM',
+          endTime: '6:00 PM',
+        },
+      ],
     });
 
     await tx.tourInclusion.createMany({
@@ -42,7 +60,7 @@ export async function seedShared(userId: string) {
       data: [
         {
           tourId: tour.id,
-          pricingType: PricingType.PRIVATE,
+          pricingType: PricingType.JOINER,
           minGroupSize: 1,
           maxGroupSize: 12,
           price: 800,

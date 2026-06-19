@@ -13,7 +13,7 @@ export async function getTransferCalendarService(
 
   const { start, end } = getMonthRange(month);
 
-  const day = eachDayOfInterval({ start, end });
+  const days = eachDayOfInterval({ start, end });
 
   if (transfer.hasSchedule && !scheduleId) {
     throw new Error('Schedule must be selected');
@@ -40,7 +40,7 @@ export async function getTransferCalendarService(
 
     const inventoryMap = new Map(inventories.map((i) => [i.date.getTime(), i]));
 
-    return day.map((d) => {
+    return days.map((d) => {
       const key = startOfDay(d).getTime();
       const inventoryRow = inventoryMap.get(key);
 

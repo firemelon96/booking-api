@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { authenticate } from '../../../middlewares/auth.middleware';
-import { userCreateBooking } from './tour-booking.controller';
+import { requireAdmin } from '../../../middlewares/role.middleware';
 
 const router = Router({ mergeParams: true });
 
-router.post('/', authenticate, userCreateBooking);
+router.post('/set-inventory', authenticate, requireAdmin);
 
 export default router;
