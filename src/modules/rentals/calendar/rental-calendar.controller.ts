@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { rentalCalendarSchema } from './rental-calendar.validator';
 import { rentalItemAvailabilityService } from './rental-calendar.service';
+import { rentalSlugParamsSchema } from '../rental.validator';
 
 export async function rentalItemCalendarAvailability(
   req: Request,
@@ -14,9 +15,11 @@ export async function rentalItemCalendarAvailability(
   }
 
   try {
-    const availability = await rentalItemAvailabilityService(payload.data);
+    const calendarAvailability = await rentalItemAvailabilityService(
+      payload.data,
+    );
 
-    res.json(availability);
+    res.json(calendarAvailability);
   } catch (error) {
     next(error);
   }

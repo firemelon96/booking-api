@@ -9,6 +9,10 @@ generator client {
   output   = "../src/generated/prisma"
 }
 
+generator erd {
+  provider = "prisma-erd-generator"
+}
+
 datasource db {
   provider = "postgresql"
 }
@@ -197,7 +201,7 @@ model TourExclusion {
 model  ServiceLike {
   id  String @id @default(uuid())
 
-  serviceType BookingType
+  serviceType ServiceType
 
   userId  String
 
@@ -211,6 +215,9 @@ model  ServiceLike {
 
   accommodationId String?
   accommodation Accommodation? @relation(fields: [accommodationId], references: [id], onDelete: Cascade)
+
+  unitId String
+  unit AccommodationUnit? @relation(fields: [unitId], references: [id], onDelete: Cascade)
 
   rentalItemId String?
   item RentalItem? @relation(fields: [rentalItemId] , references: [id], onDelete: Cascade)
@@ -244,7 +251,7 @@ model TourDailyCapacity {
   id String @id @default(uuid())
 
   date     DateTime
-  availableSlots Int
+  capacitySlots Int
   bookedSlots   Int      @default(0) // current used slots
 
   scheduleId String?
@@ -346,7 +353,17 @@ model Image {
   rentalId String?
   rental Rental? @relation(fields: [rentalId], references: [id], onDelete: Cascade)
 
-  items RentalItemImage[]
+  rentalItemId String?
+  item RentalItem? @relation(fields: [rentalItemId], references: [id], onDelete: Cascade)
+
+  accommodationId String?
+  accommodation Accommodation? @relation(fields: [accommodationId], references: [id], onDelete: Cascade)
+
+  unitId  String?
+  unit AccommodationUnit? @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  reviewId String?
+  review Review? @relation(fields: [reviewId], references: [id], onDelete: Cascade)
 
   userProfile User? @relation("UserProfileImage")
 
@@ -393,7 +410,7 @@ model Booking {
   id  String  @id @default(uuid())
 
   reference String @unique
-  type BookingType
+  type ServiceType
 
   userId  String
   user  User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -530,13 +547,23 @@ model Review {
   id         String @id @default(uuid())
   starRating Int
   comment    String
-  // imageIds    String[]
+  imageIds    String[]
 
   userId String
-  tourId String
+  tourId String?
+  transferId String?
+  accommodationId String?
+  unitId String?
+  rentalItemId String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tour Tour @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  tour Tour? @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  transfer Transfer? @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  accommodation Accommodation? @relation(fields: [accommodationId], references: [id], onDelete: Cascade)
+  unit AccommodationUnit? @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  rentalItem RentalItem? @relation(fields: [rentalItemId], references: [id], onDelete: Cascade)
+
+  images Image[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -578,7 +605,7 @@ model Accommodation {
 
   units AccommodationUnit[]
 
-  images AccommodationImage[]
+  images Image[]
 
   amenities AccommodationAmenity[]
 
@@ -587,6 +614,8 @@ model Accommodation {
   inventory AccommodationInventory[]
 
   likes ServiceLike[]
+
+  reviews Review[]
 
   cancellationPolicy  AccommodationCancellationPolicy?
 
@@ -623,7 +652,11 @@ model AccommodationUnit {
 
   amenities  AccommodationUnitAmenity[]
 
-  images AccommodationUnitImage[]
+  images Image[]
+
+  reviews Review[]
+
+  likes ServiceLike[]
 
   @@unique([accommodationId, slug])
 }
@@ -645,36 +678,6 @@ model Amenity {
   transfers TransferAmenity[]
 
   units AccommodationUnitAmenity[]
-}
-
-model AccommodationImage {
-  id String @id @default(uuid())
-
-  accommodationId String
-  accommodation Accommodation @relation(fields: [accommodationId], references: [id], onDelete: Cascade)
-
-  url String
-
-  isFeatured Boolean @default(false)
-
-  sortOrder Int @default(0)
-
-  createdAt DateTime @default(now())
-}
-
-model AccommodationUnitImage {
-  id String @id @default(uuid())
-
-  unitId String
-  unit AccommodationUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
-
-  url String
-
-  isFeatured Boolean @default(false)
-
-  sortOrder Int @default(0)
-
-  createdAt DateTime @default(now())
 }
 
 model AccommodationAmenity {
@@ -813,6 +816,8 @@ model Transfer {
   bookings TransferBooking[]
 
   likes ServiceLike[]
+
+  reviews Review[]
 
   images Image[]
 }
@@ -992,31 +997,14 @@ model RentalItem {
 
   bookings RentalBooking[]
 
-  rentalItemImages RentalItemImage[]
-
   likes ServiceLike[]
+
+  reviews Review[]
+
+  images Image[]
 
   @@unique([rentalId, itemCode])
   @@index([rentalId])
-}
-
-model RentalItemImage {
-  id String @id @default(uuid())
-
-  rentalItemId String
-  rentalItem RentalItem @relation(fields: [rentalItemId], references: [id], onDelete: Cascade)
-
-  imageId String
-  image Image @relation(fields: [imageId], references: [id])
-
-  isPrimary Boolean @default(false)
-
-  position Int @default(0)
-
-  createdAt DateTime @default(now())
-
-  @@index([rentalItemId])
-  @@index([imageId])
 }
 
 model RentalInventory {
@@ -1107,7 +1095,7 @@ enum RentalPricingType {
   WEEKLY
 }
 
-enum BookingType {
+enum ServiceType {
   TOUR
   ACCOMMODATION
   TRANSFER
@@ -1178,8 +1166,11 @@ enum ImageType {
   ITINERARY
   TRANSFER
   ACCOMMODATION
-  RENTALS
+  ACCOMMODATIONUNIT
+  RENTALITEMS
+  RENTAL
   PROFILE
+  REVIEW
 }
 
 enum ImageStatus {

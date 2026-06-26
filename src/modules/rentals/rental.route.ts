@@ -8,6 +8,7 @@ import {
   removeRentalController,
   updateRentalController,
 } from './rental.controller';
+import RentalCalendarRoutes from './calendar/rental-calendar.route';
 
 import rentalItemRoutes from './items/rental-item.route';
 
@@ -15,6 +16,7 @@ const router = Router({ mergeParams: true });
 
 router.get('/', getAllRentalsController);
 router.get('/:slug', getRentalDetailController);
+router.get('/:slug/calendar', RentalCalendarRoutes);
 
 router.post('/', authenticate, requireAdmin, createRentalController);
 router.patch('/:rentalId', authenticate, requireAdmin, updateRentalController);
