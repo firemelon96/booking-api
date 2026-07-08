@@ -23,10 +23,10 @@ ENV TZ=UTC
 COPY package*.json ./
 RUN npm install --omit=dev
 
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+COPY dist ./dist
+COPY public ./public
+COPY prisma ./prisma
+COPY prisma.config.ts ./prisma.config.ts
 
 EXPOSE 4000
 
