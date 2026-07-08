@@ -1,0 +1,21 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_middleware_1 = require("../../../middlewares/auth.middleware");
+const role_middleware_1 = require("../../../middlewares/role.middleware");
+const rental_item_controller_1 = require("./rental-item.controller");
+const rental_pricing_route_1 = __importDefault(require("../pricings/rental-pricing.route"));
+const rental_booking_route_1 = __importDefault(require("../bookings/rental-booking.route"));
+const review_route_1 = __importDefault(require("../review/review.route"));
+const router = (0, express_1.Router)({ mergeParams: true });
+router.post('/', auth_middleware_1.authenticate, role_middleware_1.requireAdmin, rental_item_controller_1.createRentalItemController);
+router.post('/bulk-create', auth_middleware_1.authenticate, role_middleware_1.requireAdmin, rental_item_controller_1.bulkCreateRentalItemsController);
+router.patch('/:itemId', auth_middleware_1.authenticate, role_middleware_1.requireAdmin, rental_item_controller_1.updateRentalItemController);
+router.delete('/:itemId', auth_middleware_1.authenticate, role_middleware_1.requireAdmin, rental_item_controller_1.removeRentalItemController);
+router.use('/:itemId/pricings', rental_pricing_route_1.default);
+router.use('/:itemId/bookings', rental_booking_route_1.default);
+router.use('/:itemId/review', review_route_1.default);
+exports.default = router;

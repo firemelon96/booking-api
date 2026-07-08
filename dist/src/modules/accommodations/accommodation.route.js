@@ -1,0 +1,24 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_middleware_1 = require("../../middlewares/auth.middleware");
+const role_middleware_1 = require("../../middlewares/role.middleware");
+const accommodation_controller_1 = require("./accommodation.controller");
+const calendar_route_1 = __importDefault(require("./calendar/calendar.route"));
+const inventory_route_1 = __importDefault(require("./inventory/inventory.route"));
+const units_routes_1 = __importDefault(require("./unit/units.routes"));
+const accommodation_booking_route_1 = __importDefault(require("./booking/accommodation-booking.route"));
+const router = (0, express_1.Router)();
+router.get('/', accommodation_controller_1.getAccommodations);
+router.get('/:slug', accommodation_controller_1.getAccommodationDetailController);
+router.post('/', auth_middleware_1.authenticate, role_middleware_1.requireAdmin, accommodation_controller_1.createAccommodation);
+router.patch('/:accommodationId', auth_middleware_1.authenticate, role_middleware_1.requireAdmin, accommodation_controller_1.updateAccommodation);
+router.delete('/:accommodationId', auth_middleware_1.authenticate, role_middleware_1.requireAdmin, accommodation_controller_1.removeAccommodation);
+router.use('/:accommodationId/units', units_routes_1.default);
+router.use('/:accommodationId/bookings', accommodation_booking_route_1.default);
+router.use('/:slug/calendar', calendar_route_1.default);
+router.use('/:accommodationId/inventory', inventory_route_1.default);
+exports.default = router;

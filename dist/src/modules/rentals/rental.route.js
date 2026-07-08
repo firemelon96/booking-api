@@ -1,0 +1,20 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_middleware_1 = require("../../middlewares/auth.middleware");
+const role_middleware_1 = require("../../middlewares/role.middleware");
+const rental_controller_1 = require("./rental.controller");
+const rental_calendar_route_1 = __importDefault(require("./calendar/rental-calendar.route"));
+const rental_item_route_1 = __importDefault(require("./items/rental-item.route"));
+const router = (0, express_1.Router)({ mergeParams: true });
+router.get('/', rental_controller_1.getAllRentalsController);
+router.get('/:slug', rental_controller_1.getRentalDetailController);
+router.get('/:slug/calendar', rental_calendar_route_1.default);
+router.post('/', auth_middleware_1.authenticate, role_middleware_1.requireAdmin, rental_controller_1.createRentalController);
+router.patch('/:rentalId', auth_middleware_1.authenticate, role_middleware_1.requireAdmin, rental_controller_1.updateRentalController);
+router.delete('/:rentalId', auth_middleware_1.authenticate, role_middleware_1.requireAdmin, rental_controller_1.removeRentalController);
+router.use('/:rentalId/items', rental_item_route_1.default);
+exports.default = router;

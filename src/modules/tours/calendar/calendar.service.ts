@@ -33,7 +33,7 @@ export async function calendarAvailability({
       },
       select: {
         date: true,
-        availableSlots: true,
+        capacitySlots: true,
         bookedSlots: true,
       },
     });
@@ -83,15 +83,15 @@ export async function calendarAvailability({
       }
 
       if (capacityRow) {
-        if (capacityRow.bookedSlots >= capacityRow.availableSlots) {
+        if (capacityRow.bookedSlots >= capacityRow.capacitySlots) {
           status = 'FULL';
-          capacity = capacityRow.availableSlots;
+          capacity = capacityRow.capacitySlots;
           booked = capacityRow.bookedSlots;
         } else {
           status = 'AVAILABLE';
-          capacity = capacityRow.availableSlots;
+          capacity = capacityRow.capacitySlots;
           booked = capacityRow.bookedSlots;
-          remainingSlots = capacityRow.availableSlots - capacityRow.bookedSlots;
+          remainingSlots = capacityRow.capacitySlots - capacityRow.bookedSlots;
         }
       } else {
         status = 'NO_CAPACITY';

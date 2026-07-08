@@ -57,8 +57,6 @@ export async function updateRentalItemService(
 
   const rentalItem = await findRentalItemByIdOrFail(itemId);
 
-  const slug = name ? slugify(name) : undefined;
-
   if (rentalItem.rentalId !== rental.id) {
     throw new Error('Rental item does not belong to the specified rental');
   }
@@ -71,7 +69,6 @@ export async function updateRentalItemService(
         description,
         itemCode,
         quantity,
-        slug,
       },
     });
 

@@ -322,7 +322,7 @@ export async function cancelTourbooking({
         bookingStatus: 'CANCELLED',
         refundAmount,
         refundStatus: 'PENDING',
-        canceledAt: new Date(),
+        cancelledAt: new Date(),
         cancellationRefundType: refundType as CancellationRefundType,
         cancellationRefundPercentage: refundPercentage,
         isAdminOverride: role === 'ADMIN',
