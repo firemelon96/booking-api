@@ -9,6 +9,7 @@ import {
 } from './rental-item.controller';
 import rentalPricingRoutes from '../pricings/rental-pricing.route';
 import rentalItemBookingRoutes from '../bookings/rental-booking.route';
+import reviewRoutes from '../review/review.route';
 
 const router = Router({ mergeParams: true });
 
@@ -34,5 +35,6 @@ router.delete(
 
 router.use('/:itemId/pricings', rentalPricingRoutes);
 router.use('/:itemId/bookings', rentalItemBookingRoutes);
+router.use('/:itemId/review', reviewRoutes);
 
 export default router;

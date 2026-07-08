@@ -2,6 +2,7 @@ import cloudinary from '../../../config/cloudinary';
 import { prisma } from '../../../config/prisma';
 import { Prisma } from '../../../generated/prisma/client';
 import { findTourOrFail } from '../tour.query';
+import { SetFeaturedInput } from './image.type';
 
 export async function attachImages(
   tx: Prisma.TransactionClient,
@@ -72,5 +73,32 @@ export async function updateTourImages(
       status: 'ACTIVE',
       type: 'TOUR',
     },
+  });
+}
+
+export async function setFeaturedService({
+  tourId,
+  imageId,
+}: SetFeaturedInput) {
+  return prisma.$transaction(async (tx) => {
+    await tx.image.updateMany({
+      where: {
+        tourId,
+        isFeatured: true,
+      },
+      data: {
+        isFeatured: false,
+      },
+    });
+
+    await tx.image.update({
+      where: {
+        id: imageId,
+        tourId,
+      },
+      data: {
+        isFeatured: true,
+      },
+    });
   });
 }

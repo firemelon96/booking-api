@@ -1,10 +1,7 @@
 import { prisma } from '../../../config/prisma';
-import { CancellationRefundType, Role } from '../../../generated/prisma/enums';
+import { Role } from '../../../generated/prisma/enums';
 import { logBookingAction } from '../../bookings/audit/booking-audit.service';
-import {
-  calculateCancellationRefund,
-  createUniqueBookingReference,
-} from '../../bookings/booking.query';
+import { createUniqueBookingReference } from '../../bookings/booking.query';
 import { BOOKING_RULES } from '../../bookings/booking.rule';
 import { BookingInputType } from '../../bookings/booking.type';
 import {

@@ -1,29 +1,29 @@
 import { NextFunction, Request, Response } from 'express';
-import { findTourOrFail } from '../tour.query';
-import { setFeaturedService, updateTourImages } from './images.service';
-import { tourIdParams } from '../tour.validator';
-import { setFeaturedParams } from './image.validator';
+import { setFeaturedService, updateTransferImages } from './image.service';
+import { transferIdParams } from '../transfer.validator';
+import { imageSchema, setFeaturedParams } from './image.validator';
 
-export async function replaceImages(
+export async function updateImagesController(
   req: Request,
   res: Response,
   next: NextFunction,
 ) {
-  const { existingImageIds, newImageIds } = req.body;
-
-  const params = tourIdParams.safeParse(req.params);
+  const params = transferIdParams.safeParse(req.params);
 
   if (!params.success) {
     throw new Error('Invalid params');
   }
 
-  try {
-    await updateTourImages(params.data.tourId, {
-      existingImageIds,
-      newImageIds,
-    });
+  const payload = imageSchema.safeParse(req.body);
 
-    res.json({ message: 'Images updated successfully' });
+  if (!payload.success) {
+    throw new Error('Invalid fields');
+  }
+
+  try {
+    await updateTransferImages(params.data.transferId, payload.data);
+
+    res.json({ success: true, message: 'Images updated successfully.' });
   } catch (error) {
     next(error);
   }

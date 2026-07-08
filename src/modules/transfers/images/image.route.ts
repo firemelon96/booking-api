@@ -1,12 +1,20 @@
 import { Router } from 'express';
-
 import { authenticate } from '../../../middlewares/auth.middleware';
 import { requireAdmin } from '../../../middlewares/role.middleware';
-import { replaceImages, setFeaturedController } from './image.controller';
+import {
+  setFeaturedController,
+  updateImagesController,
+} from './image.controller';
 
 const router = Router({ mergeParams: true });
 
-router.post('/replace-images', authenticate, requireAdmin, replaceImages);
+router.post(
+  '/update-image',
+  authenticate,
+  requireAdmin,
+  updateImagesController,
+);
+
 router.patch(
   '/:imageId/set-featured',
   authenticate,

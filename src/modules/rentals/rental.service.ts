@@ -174,7 +174,7 @@ export async function createRentalService(
         data: {
           rentalId: rental.id,
           status: 'ACTIVE',
-          type: 'RENTALS',
+          type: 'RENTAL',
         },
       });
     }

@@ -7,6 +7,7 @@ export const rentalItemsSchema = z.object({
   itemCode: z.string(),
   quantity: z.number().optional(),
   pricing: z.array(createRentalPricingBodySchema),
+  imageIds: z.string().array(),
 });
 
 export const rentalItemIdParamsSchema = z.object({

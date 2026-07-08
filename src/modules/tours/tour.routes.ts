@@ -16,6 +16,7 @@ import tourBookingRoutes from './booking/tour-booking.route';
 import availabilityRoutes from './availability/availability.routes';
 import calendarRoutes from './calendar/calendar.route';
 import likeRoutes from './like/like.route';
+import reviewRoutes from './review/review.route';
 import cancellationPolicyRoutes from './cancellation-policy/cancellation.route';
 
 const router = Router();
@@ -41,5 +42,6 @@ router.use('/:tourId/cancellation-policy', cancellationPolicyRoutes);
 //auth user
 router.use('/:tourId/like', likeRoutes);
 router.use('/:tourId/booking', tourBookingRoutes);
+router.use('/:tourId/review', reviewRoutes);
 
 export default router;

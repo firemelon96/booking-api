@@ -6,26 +6,46 @@ import { CreateRentalItemType, RentalItemIdParams } from './rental-item.type';
 
 export async function createRentalItemService(
   rentalId: string,
-  { itemCode, name, pricing, description, quantity }: CreateRentalItemType,
+  {
+    itemCode,
+    name,
+    pricing,
+    description,
+    quantity,
+    imageIds,
+  }: CreateRentalItemType,
 ) {
   const rental = await findRentalByIdOrFail(rentalId);
 
-  return prisma.rentalItem.create({
-    data: {
-      name,
-      description,
-      itemCode,
-      quantity,
-      rentalId: rental.id,
-      pricing: {
-        createMany: {
-          data: pricing.map((p) => ({
-            price: p.price,
-            pricingType: p.pricingType,
-          })),
+  return prisma.$transaction(async () => {
+    const rentalItem = await prisma.rentalItem.create({
+      data: {
+        name,
+        description,
+        itemCode,
+        quantity,
+        rentalId: rental.id,
+        pricing: {
+          createMany: {
+            data: pricing.map((p) => ({
+              price: p.price,
+              pricingType: p.pricingType,
+            })),
+          },
         },
       },
-    },
+    });
+
+    if (imageIds.length > 0) {
+      await prisma.image.updateMany({
+        where: { id: { in: imageIds } },
+        data: {
+          rentalItemId: rentalItem.id,
+          type: 'RENTALITEMS',
+          status: 'ACTIVE',
+        },
+      });
+    }
   });
 }
 
