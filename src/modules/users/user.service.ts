@@ -60,6 +60,7 @@ export async function fetchProfile(userId: string) {
     include: {
       bookings: true,
       reviews: true,
+      likedService: true,
     },
   });
 }

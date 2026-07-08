@@ -1,5 +1,13 @@
+import z from 'zod';
 import { prisma } from '../../config/prisma';
-import { CancellationPolicy, Role } from '../../generated/prisma/client';
+import {
+  CancellationPolicy,
+  CancellationRefundType,
+  PaymentStatus,
+  Prisma,
+  Role,
+} from '../../generated/prisma/client';
+import { generateBookingReference } from './booking.reference';
 
 export function detectOverbooking({
   capacity,
@@ -22,20 +30,58 @@ export async function findBookingOrThrow({
   role: Role;
   userId: string;
 }) {
-  let booking;
-
-  if (role === 'ADMIN') {
-    booking = await prisma.booking.findUnique({
-      where: {
-        id: bookingId,
-      },
-    });
-  }
-
-  booking = await prisma.booking.findFirst({
+  const booking = await prisma.booking.findFirst({
     where: {
       id: bookingId,
-      userId,
+      ...(role === 'USER' ? { userId } : {}),
+    },
+    include: {
+      tourBooking: {
+        select: {
+          tour: true,
+          startDate: true,
+          endDate: true,
+          notes: true,
+          participants: true,
+          pricingType: true,
+          schedule: true,
+        },
+      },
+      accommodationBooking: {
+        select: {
+          accommodation: {
+            select: { hasUnits: true, name: true },
+          },
+          unit: true,
+          checkIn: true,
+          checkOut: true,
+          guests: true,
+          nights: true,
+          specialRequests: true,
+        },
+      },
+      transferBooking: {
+        select: {
+          transfer: true,
+          date: true,
+          passengers: true,
+          pickupLocation: true,
+          dropoffLocation: true,
+          pricingType: true,
+          schedule: true,
+        },
+      },
+      rentalBooking: {
+        select: {
+          item: true,
+          startDate: true,
+          endDate: true,
+          pickupLocation: true,
+          returnLocation: true,
+          notes: true,
+          quantity: true,
+        },
+      },
     },
   });
 
@@ -46,22 +92,69 @@ export async function findBookingOrThrow({
   return booking;
 }
 
+export async function findBookingById(bookingId: string) {
+  const booking = await prisma.booking.findFirst({
+    where: {
+      id: bookingId,
+    },
+  });
+
+  if (!booking) {
+    throw new Error('Booking Not found');
+  }
+
+  return booking;
+}
+
+export async function findTourBookingOrThrow({
+  bookingId,
+  userId,
+  role,
+}: {
+  bookingId: string;
+  userId: string;
+  role: Role;
+}) {
+  const tourBooking = await prisma.tourBooking.findUnique({
+    where: { bookingId, ...(role === 'USER' ? { userId } : {}) },
+    include: { booking: true, tour: true },
+  });
+
+  if (!tourBooking) {
+    throw new Error('Cannot find tour');
+  }
+
+  return tourBooking;
+}
+
 export function calculateCancellationRefund({
   bookingDate,
-  tourStartDate,
+  startDate,
   totalPrice,
   policy,
 }: {
   bookingDate: Date;
-  tourStartDate: Date;
+  startDate: Date;
   totalPrice: number;
-  policy: CancellationPolicy;
-}) {
+  policy?: CancellationPolicy | null;
+}): {
+  refundType: CancellationRefundType;
+  refundAmount: number;
+  refundPercentage: number;
+} {
   const now = bookingDate;
 
-  const diffMs = tourStartDate.getTime() - now.getTime();
+  const diffMs = startDate.getTime() - now.getTime();
 
   const hoursBeforeTour = diffMs / (1000 * 60 * 60);
+
+  if (!policy) {
+    return {
+      refundAmount: totalPrice,
+      refundPercentage: 100,
+      refundType: 'FULL',
+    };
+  }
 
   if (hoursBeforeTour >= policy.fullRefundHours) {
     return {
@@ -86,4 +179,22 @@ export function calculateCancellationRefund({
     refundAmount: 0,
     refundPercentage: 0,
   };
+}
+
+export async function createUniqueBookingReference(
+  tx: Prisma.TransactionClient,
+) {
+  while (true) {
+    const reference = generateBookingReference();
+
+    const existing = await tx.booking.findUnique({
+      where: {
+        reference,
+      },
+    });
+
+    if (!existing) {
+      return reference;
+    }
+  }
 }

@@ -1,45 +1,53 @@
 import { eachDayOfInterval } from 'date-fns';
 import { prisma } from '../../config/prisma';
-import { CancellationRefundType, Role } from '../../generated/prisma/enums';
+import { Role } from '../../generated/prisma/enums';
 import { normalizeInterval } from '../../utils/helper';
-import { findTourOrFail } from '../tours/tour.query';
 import {
-  BookingCancelInput,
-  BookingCreateInput,
-  BookingDetailInput,
+  BookingInputType,
   BookingQueryType,
-  BookingReschedInput,
+  RescheduleBookingPayload,
 } from './booking.type';
-import {
-  validateBookingRules,
-  validateCancelRules,
-  validateRescheduleRules,
-} from './booking.rule';
-import { checkAvailability } from '../tours/availability/availability.query';
-import {
-  prepareCapacity,
-  releaseCapacity,
-  reserveCapacity,
-} from '../tours/capacity/capacity.query';
-import { calculate } from '../tours/pricing/pricing.query';
+import { releaseCapacity } from '../tours/capacity/capacity.query';
 import { logBookingAction } from './audit/booking-audit.service';
+import { findBookingOrThrow } from './booking.query';
 import {
-  calculateCancellationRefund,
-  findBookingOrThrow,
-} from './booking.query';
+  mapAccommodationBooking,
+  mapRentalBooking,
+  mapTourBooking,
+  mapTransferBooking,
+} from './booking-response.mapped';
+import {
+  cancelAccommodationBookingService,
+  reschedAccommodationBooking,
+} from '../accommodations/booking/accommodation-booking.service';
+import {
+  cancelTourbooking,
+  rescheduleTourBooking,
+} from '../tours/booking/tour-booking.service';
+import {
+  cancelTransferBooking,
+  rescheduleTransferBooking,
+} from '../transfers/bookings/booking.service';
+import {
+  cancelRentalBooking,
+  rescheduleRentalItemBookingService,
+} from '../rentals/bookings/rental-booking.service';
+import { BookingWhereInput } from '../../generated/prisma/models';
 
-export async function getAllBookings({
-  userId,
-  role,
-  startDate,
-  endDate,
-  page = 1,
-  limit = 10,
-  search,
-  sort = 'createdAt:desc',
-  status,
-  tourId,
-}: BookingQueryType) {
+export async function getAllBookingsService(
+  userId: string,
+  role: Role,
+  {
+    page = 1,
+    limit = 10,
+    search,
+    sort = 'createdAt:desc',
+    bookingStatus,
+    paymentStatus,
+    reference,
+    type,
+  }: BookingQueryType,
+) {
   const safePage = Math.max(1, page);
   const safeLimit = Math.min(50, limit);
   const skip = (safePage - 1) * safeLimit;
@@ -50,50 +58,67 @@ export async function getAllBookings({
     [sortField || 'createdAt']: sortOrder === 'asc' ? 'asc' : 'desc',
   };
 
-  const where: any = {};
-
-  if (role === 'USER') {
-    where.userId = userId;
-
-    if (search) {
-      where.OR = [
+  const where: BookingWhereInput = {
+    ...(role === 'USER' && { userId }),
+    ...(bookingStatus && { bookingStatus }),
+    ...(paymentStatus && { paymentStatus }),
+    ...(reference && { reference }),
+    ...(type && { type }),
+    ...(search && {
+      OR: [
         {
-          tour: {
-            name: { contains: search, mode: 'insensitive' },
+          tourBooking: {
+            tour: {
+              name: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
           },
         },
         {
-          tour: {
-            description: { contains: search, mode: 'insensitive' },
+          accommodationBooking: {
+            accommodation: {
+              name: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
           },
         },
-      ];
-    }
-  }
-
-  if (tourId) where.tourId = tourId;
-  if (status) where.status = status;
-
-  if (startDate || endDate) {
-    where.startDate = {};
-    if (startDate) where.startDate.gte = startDate;
-    if (endDate) where.endDate.lte = endDate;
-  }
-
-  if (search) {
-    where.OR = [
-      {
-        user: {
-          email: { contains: search, mode: 'insensitive' },
+        {
+          accommodationBooking: {
+            unit: {
+              name: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+          },
         },
-      },
-      {
-        tour: {
-          name: { contains: search, mode: 'insensitive' },
+        {
+          transferBooking: {
+            transfer: {
+              name: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+          },
         },
-      },
-    ];
-  }
+        {
+          rentalBooking: {
+            item: {
+              name: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+      ],
+    }),
+  };
 
   const [data, total] = await prisma.$transaction([
     prisma.booking.findMany({
@@ -102,17 +127,29 @@ export async function getAllBookings({
       take: safeLimit,
       orderBy,
       include: {
-        tour: {
+        user: true,
+        tourBooking: {
+          select: { tour: true, startDate: true, endDate: true },
+        },
+        accommodationBooking: {
           select: {
-            id: true,
-            name: true,
-            slug: true,
+            accommodation: true,
+            unit: true,
+            checkIn: true,
+            checkOut: true,
           },
         },
-        user: {
+        transferBooking: {
           select: {
-            id: true,
-            email: true,
+            transfer: true,
+            date: true,
+          },
+        },
+        rentalBooking: {
+          select: {
+            item: true,
+            startDate: true,
+            endDate: true,
           },
         },
       },
@@ -123,15 +160,24 @@ export async function getAllBookings({
   return {
     data: data.map((b) => ({
       id: b.id,
-      tourName: b.tour.name,
-      email: b.user.email ?? '',
-      participants: b.participants,
-      pricingType: b.pricingType,
-      status: b.status,
+      user: b.user.email,
+      reference: b.reference,
+      type: b.type,
+      bookingStatus: b.bookingStatus,
+      paymentStatus: b.paymentStatus,
       totalPrice: b.totalPrice,
-      startDate: b.startDate,
-      endDate: b.endDate,
-      createdAt: b.createdAt,
+      tourName: b.tourBooking?.tour.name,
+      tourStart: b.tourBooking?.startDate,
+      tourEnd: b.tourBooking?.endDate,
+      accommodationName: b.accommodationBooking?.accommodation.name,
+      accommodationUnitName: b.accommodationBooking?.unit?.name,
+      checkIn: b.accommodationBooking?.checkIn,
+      checkOut: b.accommodationBooking?.checkOut,
+      rentalItemName: b.rentalBooking?.item.name,
+      rentalStart: b.rentalBooking?.startDate,
+      rentalEnd: b.rentalBooking?.endDate,
+      transferName: b.transferBooking?.transfer.name,
+      travelDate: b.transferBooking?.date,
     })),
 
     meta: {
@@ -143,302 +189,149 @@ export async function getAllBookings({
   };
 }
 
-export async function createBooking({
-  startDate,
-  endDate,
-  participants,
-  pricingType,
-  tourId,
-  notes,
-  scheduleId,
-  userId,
-  role,
-}: BookingCreateInput) {
-  const interval = normalizeInterval(startDate, endDate);
-  const tour = await findTourOrFail(tourId);
-
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes from now
-  // const scheduleKey = scheduleId ?? 'NO_SCHEDULE';
-
-  validateBookingRules({
-    scheduleId: scheduleId ?? null,
-    participants,
-    durationDays: tour.durationDays ?? undefined,
-    schedules: tour.schedules,
-    interval,
-  });
-
-  const dates = eachDayOfInterval(interval);
-
-  return prisma.$transaction(async (tx) => {
-    await checkAvailability({ tx, tourId, dates, role, userId });
-
-    const capacityContext = await prepareCapacity({
-      tx,
-      tourId,
-      scheduleId: scheduleId ?? null,
-      joinerCapacity: tour.joinerCapacity,
-      dates,
-    });
-
-    const { hasOverbooking, hasConflict } = await reserveCapacity({
-      tx,
-      capacityMode: tour.capacityMode,
-      dates,
-      participants,
-      ctx: capacityContext,
-      pricingType,
-      role,
-      userId,
-    });
-
-    const pricing = await calculate({
-      tx,
-      tourId,
-      pricingType,
-      participants,
-    });
-
-    const booking = await tx.booking.create({
-      data: {
-        tourId,
-        userId,
-        participants,
-        pricingType,
-        totalPrice: pricing.totalPrice,
-        startDate: interval.start,
-        endDate: interval.end,
-        notes,
-        isOverbooked: hasOverbooking,
-        isAdminOverride: role === 'ADMIN',
-        scheduleId: scheduleId || null,
-        expiresAt,
-        status: 'PENDING',
+export async function getBookingByReference(reference: string) {
+  const booking = await prisma.booking.findUnique({
+    where: {
+      reference,
+    },
+    include: {
+      tourBooking: { select: { tour: true } },
+      accommodationBooking: {
+        select: {
+          accommodation: true,
+          unit: true,
+        },
       },
-    });
-
-    await logBookingAction({
-      tx,
-      userId,
-      role,
-      newValue: booking,
-      action: 'CREATED',
-    });
-
-    return { booking, hasConflict };
+    },
   });
+
+  if (!booking) {
+    throw new Error('No booking record');
+  }
+
+  switch (booking.type) {
+    case 'TOUR':
+      return mapTourBooking(booking);
+    case 'ACCOMMODATION':
+      return mapAccommodationBooking(booking);
+    default:
+      throw new Error('Booking does not exist');
+  }
 }
 
-export async function rescheduleBooking({
-  bookingId,
-  newEndDate,
-  newStartDate,
-  scheduleId,
-  userId,
-  role,
-}: BookingReschedInput) {
-  const existingBooking = await findBookingOrThrow({
-    bookingId,
-    role,
-    userId,
-  });
+export async function rescheduleBooking(
+  bookingId: string,
+  userId: string,
+  role: Role,
+  payload: RescheduleBookingPayload,
+) {
+  const booking = await findBookingOrThrow({ bookingId, role, userId });
 
-  const tour = await findTourOrFail(existingBooking.tourId);
+  switch (booking.type) {
+    case 'ACCOMMODATION':
+      return reschedAccommodationBooking(bookingId, userId, role, {
+        checkIn: payload.checkIn!,
+        checkOut: payload.checkOut!,
+      });
+    case 'TOUR':
+      return rescheduleTourBooking(bookingId, userId, role, {
+        newEndDate: payload.endDate!,
+        newStartDate: payload.startDate!,
+        scheduleId: payload.scheduleId,
+      });
 
-  const newInterval = normalizeInterval(newStartDate, newEndDate);
+    case 'TRANSFER':
+      return rescheduleTransferBooking(bookingId, userId, role, {
+        travelDate: payload.travelDate!,
+        scheduleId: payload.scheduleId,
+      });
 
-  const { datesToRelease, datesToReserve } = validateRescheduleRules(
-    existingBooking,
-    newInterval,
-  );
+    case 'RENTAL':
+      return rescheduleRentalItemBookingService(bookingId, userId, role, {
+        startDate: payload.startDate!,
+        endDate: payload.endDate!,
+      });
 
-  return prisma.$transaction(async (tx) => {
-    await checkAvailability({
-      tx,
-      tourId: existingBooking.tourId,
-      dates: datesToReserve,
-      role,
-      userId,
-    });
-
-    const capacityContext = await prepareCapacity({
-      tx,
-      tourId: existingBooking.tourId,
-      scheduleId: scheduleId ?? null,
-      joinerCapacity: tour.joinerCapacity ?? 0,
-      dates: datesToReserve,
-    });
-
-    const { hasOverbooking } = await reserveCapacity({
-      tx,
-      capacityMode: tour.capacityMode,
-      dates: datesToReserve,
-      participants: existingBooking.participants,
-      ctx: capacityContext,
-      pricingType: existingBooking.pricingType,
-      role,
-      userId,
-    });
-
-    await releaseCapacity({
-      tx,
-      dates: datesToRelease,
-      participants: existingBooking.participants,
-      scheduleId,
-      tourId: existingBooking.tourId,
-    });
-
-    //no need for calculation
-
-    const resched = await tx.booking.update({
-      where: { id: bookingId },
-      data: {
-        startDate: newInterval.start,
-        endDate: newInterval.end,
-        scheduleId: scheduleId ?? null,
-        rescheduleCount: { increment: 1 },
-        lastRescheduleDate: new Date(),
-        isOverbooked: hasOverbooking,
-        isAdminOverride: role === 'ADMIN',
-      },
-    });
-
-    await logBookingAction({
-      tx,
-      userId,
-      role,
-      previousValue: existingBooking,
-      newValue: resched,
-      action: 'RESCHEDULED',
-    });
-
-    return resched;
-  });
+    default:
+      throw new Error('Invalid booking type');
+  }
 }
 
 export async function cancelbooked({
   bookingId,
   userId,
   role,
-}: BookingCancelInput) {
-  const existingBooking = await findBookingOrThrow({ bookingId, userId, role });
+}: BookingInputType) {
+  const booking = await findBookingOrThrow({ bookingId, userId, role });
 
-  validateCancelRules({ existingBooking });
+  switch (booking.type) {
+    case 'ACCOMMODATION':
+      return cancelAccommodationBookingService({ bookingId, userId, role });
 
-  const interval = normalizeInterval(
-    existingBooking.startDate,
-    existingBooking.endDate,
-  );
+    case 'TOUR':
+      return cancelTourbooking({ bookingId, userId, role });
 
-  const dates = eachDayOfInterval(interval);
+    case 'TRANSFER':
+      return cancelTransferBooking({ bookingId, userId, role });
 
-  return prisma.$transaction(async (tx) => {
-    const policy = await tx.cancellationPolicy.findUnique({
-      where: { tourId: existingBooking.tourId },
-    });
+    case 'RENTAL':
+      return cancelRentalBooking({ bookingId, userId, role });
 
-    if (!policy) {
-      throw new Error('Policy not found');
-    }
-
-    const { refundAmount, refundPercentage, refundType } =
-      calculateCancellationRefund({
-        bookingDate: existingBooking.createdAt,
-        tourStartDate: interval.start,
-        totalPrice: existingBooking.totalPrice || 0,
-        policy,
-      });
-
-    await releaseCapacity({
-      tx,
-      dates,
-      participants: existingBooking.participants,
-      tourId: existingBooking.tourId,
-      scheduleId: existingBooking.scheduleId,
-    });
-
-    const updated = await tx.booking.update({
-      where: { id: bookingId },
-      data: {
-        status: 'CANCELLED',
-        refundAmount,
-        refundStatus: 'PENDING',
-        canceledAt: new Date(),
-        cancellationRefundType: refundType as CancellationRefundType,
-        cancellationRefundPercentage: refundPercentage,
-      },
-    });
-
-    await logBookingAction({
-      tx,
-      userId,
-      role,
-      newValue: updated,
-      action: 'CANCELLED',
-    });
-
-    return updated;
-  });
+    default:
+      throw new Error('Invalid booking type');
+  }
 }
 
 export async function detailedBooking({
   bookingId,
   userId,
   role,
-}: BookingDetailInput) {
-  let booking;
+}: BookingInputType) {
+  const booking = await findBookingOrThrow({ bookingId, role, userId });
 
-  if (role === 'ADMIN') {
-    booking = await prisma.booking.findUnique({
-      where: { id: bookingId },
-      include: { tour: true, user: true },
-    });
-  } else {
-    booking = await prisma.booking.findFirst({
-      where: {
-        id: bookingId,
-        userId,
-      },
-      include: { tour: true, user: true },
-    });
+  switch (booking.type) {
+    case 'TOUR':
+      return mapTourBooking(booking);
+
+    case 'ACCOMMODATION':
+      return mapAccommodationBooking(booking);
+
+    case 'TRANSFER':
+      return mapTransferBooking(booking);
+
+    case 'RENTAL':
+      return mapRentalBooking(booking);
+
+    default:
+      throw new Error('Invalid type');
   }
-
-  if (!booking) {
-    throw new Error('No booking found');
-  }
-
-  return {
-    tourName: booking?.tour.name,
-    location: booking?.tour.location,
-    tourType: booking?.tour.type,
-    duration: booking?.tour.durationDays,
-    participants: booking?.participants,
-    userEmail: booking?.user.email,
-    totalPrice: booking?.totalPrice,
-    status: booking?.status,
-    startDate: booking?.startDate,
-    endDate: booking?.endDate,
-    scheduleId: booking?.scheduleId,
-    pricingType: booking?.pricingType,
-  };
 }
 
 export async function expiredBooking(bookingId: string) {
-  const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
+  const tourBooking = await prisma.tourBooking.findUnique({
+    where: { bookingId },
+    include: { booking: true },
+  });
 
-  if (!booking) {
+  if (!tourBooking) {
     throw new Error('Booking not found');
   }
 
-  if (booking.status !== 'PENDING') {
-    return booking;
+  if (tourBooking.booking.bookingStatus !== 'PENDING') {
+    return tourBooking;
   }
 
-  if (booking.expiresAt && booking.expiresAt < new Date()) {
-    return booking;
+  if (
+    tourBooking.booking.expiresAt &&
+    tourBooking.booking.expiresAt < new Date()
+  ) {
+    return tourBooking;
   }
 
-  const interval = normalizeInterval(booking.startDate, booking.endDate);
+  const interval = normalizeInterval(
+    tourBooking.startDate,
+    tourBooking.endDate,
+  );
 
   const dates = eachDayOfInterval(interval);
 
@@ -446,21 +339,21 @@ export async function expiredBooking(bookingId: string) {
     await releaseCapacity({
       tx,
       dates,
-      participants: booking.participants,
-      tourId: booking.tourId,
-      scheduleId: booking.scheduleId,
+      participants: tourBooking.participants,
+      tourId: tourBooking.tourId,
+      scheduleId: tourBooking.scheduleId,
     });
 
     const updated = await tx.booking.update({
       where: { id: bookingId },
       data: {
-        status: 'CANCELLED',
+        bookingStatus: 'CANCELLED',
       },
     });
 
     await logBookingAction({
       tx,
-      userId: booking.userId,
+      userId: tourBooking.booking.userId,
       role: 'ADMIN',
       newValue: updated,
       action: 'CANCELLED',

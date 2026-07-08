@@ -11,3 +11,22 @@ export async function findAccommodationOrFail(accommodationId: string) {
 
   return accommodation;
 }
+
+export async function findAccommodationBySlug(slug: string) {
+  const accom = await prisma.accommodation.findUnique({
+    where: {
+      slug,
+    },
+    include: {
+      amenities: true,
+      images: true,
+      units: true,
+    },
+  });
+
+  if (!accom) {
+    throw new Error('Accommodation not found');
+  }
+
+  return accom;
+}

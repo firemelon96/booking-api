@@ -1,4 +1,5 @@
 import { Prisma } from '../../../generated/prisma/client';
+import { logAdminWarning } from '../../logs/admin-warning.service';
 
 export async function ensureAccommodationInventoryRows(
   tx: Prisma.TransactionClient,
@@ -40,8 +41,19 @@ export async function reserveAccommodationInventory(
     accommodationId,
     dates,
     units,
-  }: { accommodationId: string; dates: Date[]; units: number },
+    userId,
+    isAdmin,
+  }: {
+    accommodationId: string;
+    dates: Date[];
+    units: number;
+    userId: string;
+    isAdmin: boolean;
+  },
 ) {
+  let hasOverbooking = false;
+  let adminOverride = false;
+
   for (const date of dates) {
     const row = await tx.accommodationInventory.findFirst({
       where: {
@@ -55,13 +67,41 @@ export async function reserveAccommodationInventory(
     }
 
     if (row.isClosed) {
-      throw new Error('Date is closed');
+      if (!isAdmin) {
+        throw new Error('Date is closed');
+      }
+
+      adminOverride = true;
+
+      await logAdminWarning({
+        tx,
+        actionType: 'BOOKED_ON_CLOSED_DATE',
+        actorId: userId,
+        message: `Admin booked accommodation on closed date ${row.date}`,
+        accommodationId,
+        metadata: row,
+      });
     }
 
     const remaining = row.availableUnits - row.bookedUnits;
+    const willOverbooked = remaining < units;
 
-    if (remaining < units) {
-      throw new Error('Not enough inventory');
+    if (willOverbooked) {
+      if (!isAdmin) {
+        throw new Error('Not enough inventory');
+      }
+
+      adminOverride = true;
+      hasOverbooking = true;
+
+      await logAdminWarning({
+        tx,
+        actionType: 'OVERBOOKING',
+        message: `Admin overbooked accommodation on ${row.date}`,
+        actorId: userId,
+        accommodationId,
+        metadata: row,
+      });
     }
 
     await tx.accommodationInventory.update({
@@ -73,12 +113,28 @@ export async function reserveAccommodationInventory(
       },
     });
   }
+  return { hasOverbooking, adminOverride };
 }
 
 export async function reserveUnitInventory(
   tx: Prisma.TransactionClient,
-  { unitId, dates, units }: { unitId: string; dates: Date[]; units: number },
+  {
+    unitId,
+    dates,
+    units,
+    isAdmin,
+    userId,
+  }: {
+    unitId: string;
+    dates: Date[];
+    units: number;
+    isAdmin: boolean;
+    userId: string;
+  },
 ) {
+  let hasOverbooking = false;
+  let adminOverride = false;
+
   for (const date of dates) {
     const row = await tx.accommodationUnitInventory.findFirst({
       where: {
@@ -92,13 +148,39 @@ export async function reserveUnitInventory(
     }
 
     if (row.isClosed) {
-      throw new Error('Date is closed');
+      if (!isAdmin) {
+        throw new Error('Date is closed');
+      }
+
+      adminOverride = true;
+
+      await logAdminWarning({
+        tx,
+        actionType: 'BOOKED_ON_CLOSED_DATE',
+        message: `Admin booked unit on closed date ${row.date}`,
+        actorId: userId,
+        unitId: row.id,
+        metadata: row,
+      });
     }
 
     const remaining = row.availableUnits - row.bookedUnits;
 
     if (remaining < units) {
-      throw new Error('Unit is fully booked');
+      if (!isAdmin) {
+        throw new Error('Unit is fully booked');
+      }
+
+      adminOverride = true;
+      hasOverbooking = true;
+
+      await logAdminWarning({
+        tx,
+        actionType: 'OVERBOOKING',
+        message: `Admin overbooked unit on ${row.date}`,
+        actorId: userId,
+        metadata: row,
+      });
     }
 
     await tx.accommodationUnitInventory.update({
@@ -112,6 +194,10 @@ export async function reserveUnitInventory(
       },
     });
   }
+  return {
+    hasOverbooking,
+    adminOverride,
+  };
 }
 
 export async function calculateAccommodationPricing(

@@ -1,7 +1,11 @@
 import { prisma } from '../src/config/prisma';
-import { PricingModel, PricingType } from '../src/generated/prisma/enums';
+import {
+  CapacityMode,
+  PricingModel,
+  PricingType,
+} from '../src/generated/prisma/enums';
 
-export async function seedMixed() {
+export async function seedMixed(userId: string) {
   return prisma.$transaction(async (tx) => {
     const tour = await tx.tour.create({
       data: {
@@ -9,18 +13,28 @@ export async function seedMixed() {
         slug: '3d2n-puerto-princesa-tour',
         description:
           'Experience the beauty of Honda Bay with our exciting day tour, perfect for nature lovers and adventure seekers. Explore pristine beaches, vibrant coral reefs, and diverse marine life in this unforgettable island-hopping adventure.',
-        inclusions: [
-          'Hotel pickup and drop-off',
-          'Lunch',
-          'Tour guide',
-          'Entrance fees',
-        ],
         durationDays: 3,
-        capacityMode: 'MIXED',
-        exclusions: ['Personal expenses', 'Gratuities'],
+        capacityMode: CapacityMode.MIXED,
         location: 'Puerto Princesa, Palawan',
         type: 'PACKAGE',
+        ownerId: userId,
       },
+    });
+
+    await tx.tourInclusion.createMany({
+      data: [
+        { title: 'Light lunch', tourId: tour.id },
+        { title: 'Water', tourId: tour.id },
+        { title: 'Snorkel', tourId: tour.id },
+      ],
+    });
+
+    await tx.tourExclusion.createMany({
+      data: [
+        { title: 'Entrance fee', tourId: tour.id },
+        { title: 'Umbrella', tourId: tour.id },
+        { title: 'Anything not mentioned', tourId: tour.id },
+      ],
     });
 
     await tx.tourPricing.createMany({

@@ -2,6 +2,7 @@ import cloudinary from '../../../config/cloudinary';
 import { prisma } from '../../../config/prisma';
 import { Prisma } from '../../../generated/prisma/client';
 import { findTourOrFail } from '../tour.query';
+import { SetFeaturedInput } from './image.type';
 
 export async function attachImages(
   tx: Prisma.TransactionClient,
@@ -30,32 +31,39 @@ export async function updateTourImages(
   await findTourOrFail(id);
 
   //get current images
-  const currentImages = await prisma.image.findMany({ where: { tourId: id } });
-
-  const currentIds = currentImages.map((img) => img.id);
-
-  //find images to delete
-  const toDeleteIds = currentIds.filter(
-    (id) => !input.existingImageIds.includes(id),
-  );
-
-  const toDeleteImages = currentImages.filter((img) =>
-    toDeleteIds.includes(img.id),
-  );
-
-  //Delete from cloudinary
-  await Promise.all(
-    toDeleteImages.map((img) => cloudinary.uploader.destroy(img.publicId)),
-  );
-
-  //delete from the db
-  await prisma.image.deleteMany({
-    where: {
-      id: {
-        in: toDeleteIds,
-      },
+  const currentImages = await prisma.image.findMany({
+    where: { tourId: id },
+    select: {
+      id: true,
+      publicId: true,
     },
   });
+
+  const existingIds = new Set(input.existingImageIds);
+
+  const imagesToDelete = currentImages.filter(
+    (img) => !existingIds.has(img.id),
+  );
+
+  if (imagesToDelete.length) {
+    //Delete from cloudinary
+    await Promise.all(
+      imagesToDelete.map((img) => cloudinary.uploader.destroy(img.publicId)),
+    );
+
+    //delete from the db
+    await prisma.image.deleteMany({
+      where: {
+        id: {
+          in: imagesToDelete.map((img) => img.id),
+        },
+      },
+    });
+  }
+
+  if (!input.newImageIds.length) {
+    return { count: 0 };
+  }
 
   //update tours
   return prisma.image.updateMany({
@@ -65,5 +73,32 @@ export async function updateTourImages(
       status: 'ACTIVE',
       type: 'TOUR',
     },
+  });
+}
+
+export async function setFeaturedService({
+  tourId,
+  imageId,
+}: SetFeaturedInput) {
+  return prisma.$transaction(async (tx) => {
+    await tx.image.updateMany({
+      where: {
+        tourId,
+        isFeatured: true,
+      },
+      data: {
+        isFeatured: false,
+      },
+    });
+
+    await tx.image.update({
+      where: {
+        id: imageId,
+        tourId,
+      },
+      data: {
+        isFeatured: true,
+      },
+    });
   });
 }

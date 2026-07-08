@@ -1,6 +1,13 @@
 import z from 'zod';
-import { createAccommodationBookingSchema } from './accommodation-booking.validator';
+import {
+  createAccommodationBookingSchema,
+  rescheduleAccommodationBookingSchema,
+} from './accommodation-booking.validator';
 
 export type CreateAccommodationBookingType = z.infer<
   typeof createAccommodationBookingSchema
+>;
+
+export type RescheduleAccommodationPayload = z.infer<
+  typeof rescheduleAccommodationBookingSchema
 >;

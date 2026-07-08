@@ -7,8 +7,9 @@ export async function lockAccommodationInventory(
   for (const date of dates) {
     await tx.$queryRaw`
     SELECT id
-    FROM "AccommodationInventory" = ${accommodationId}
-    WHERE "date" = ${date}
+    FROM "AccommodationInventory" 
+    WHERE "accommodationId" = ${accommodationId} 
+    AND "date" = ${date}
     FOR UPDATE
     `;
   }
@@ -21,8 +22,9 @@ export async function lockUnitInventory(
   for (const date of dates) {
     await tx.$queryRaw`
     SELECT id
-    FROM "AccommodationUnitInventory" = ${unitId}
-    WHERE "date" = ${date}
+    FROM "AccommodationUnitInventory" 
+    WHERE "unitId" = ${unitId}
+    AND "date" = ${date}
     FOR UPDATE
     `;
   }

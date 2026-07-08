@@ -1,12 +1,13 @@
 import { Request, Response } from 'express';
 import { daysSchema } from './itinerary.validator';
 import { modifyItinerary } from './itinerary.service';
+import { tourIdParams } from '../tour.validator';
 
 export async function replaceItinerary(req: Request, res: Response) {
-  const { tourId } = req.params;
+  const params = tourIdParams.safeParse(req.params);
   const payload = daysSchema.safeParse(req.body);
 
-  if (Array.isArray(tourId)) {
+  if (!params.success) {
     throw new Error('Invalid params');
   }
 
@@ -15,7 +16,7 @@ export async function replaceItinerary(req: Request, res: Response) {
   }
 
   try {
-    const replaced = await modifyItinerary(tourId, payload.data);
+    const replaced = await modifyItinerary(params.data.tourId, payload.data);
 
     res.json(replaced);
   } catch (error: any) {

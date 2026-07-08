@@ -1,6 +1,10 @@
 import { prisma } from '../../config/prisma';
+import { AccommodationWhereInput } from '../../generated/prisma/models';
 import { slugify } from '../../utils/slugify';
-import { findAccommodationOrFail } from './accommodation.query';
+import {
+  findAccommodationBySlug,
+  findAccommodationOrFail,
+} from './accommodation.query';
 import {
   AccommodationQueryInput,
   CreateAccommodationInput,
@@ -48,12 +52,18 @@ export async function createdAccommodation(
   });
 }
 
+export async function getAccommodationDetailService(slug: string) {
+  const accommodation = await findAccommodationBySlug(slug);
+
+  return accommodation;
+}
+
 export async function listAccommodation({
   page = 1,
   limit = 20,
   sort = 'createdAt:desc',
   search,
-  accommodationType,
+  type,
 }: AccommodationQueryInput) {
   const safePage = Math.max(1, page);
   const safeLimit = Math.min(30, limit);
@@ -65,18 +75,15 @@ export async function listAccommodation({
     [sortField || 'createdAt']: sortOrder === 'asc' ? 'asc' : 'desc',
   };
 
-  const where: any = {};
-
-  if (accommodationType) {
-    where.type = accommodationType;
-  }
-
-  if (search) {
-    where.OR = [
-      { name: { contains: search, mode: 'insensitive' } },
-      { description: { contains: search, mode: 'insensitive' } },
-    ];
-  }
+  const where: AccommodationWhereInput = {
+    ...(type && { type }),
+    ...(search && {
+      OR: [
+        { name: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+      ],
+    }),
+  };
 
   const [data, total] = await prisma.$transaction([
     prisma.accommodation.findMany({
@@ -106,12 +113,14 @@ export async function listAccommodation({
     data: data.map((a) => ({
       id: a.id,
       accommodationName: a.name,
+      slug: a.slug,
       description: a.description,
       type: a.type,
       address: a.address,
       checkIn: a.checkInTime,
       checkOut: a.checkOutTime,
       hasUnit: a.hasUnits,
+      isBookable: a.isBookable,
       units: a.units.map((u) => ({ id: u.id, name: u.name })),
       amenities: a.amenities,
     })),

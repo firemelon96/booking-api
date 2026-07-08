@@ -32,5 +32,9 @@ export const accommodationQuerySchema = z.object({
   limit: z.number().optional(),
   sort: z.string().optional(),
   search: z.string().optional(),
-  accommodationType: z.enum(AccommodationType).optional(),
+  type: z.enum(AccommodationType).optional(),
+});
+
+export const accommodationSlugParams = z.object({
+  slug: z.string(),
 });

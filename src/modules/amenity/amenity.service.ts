@@ -1,4 +1,5 @@
 import { prisma } from '../../config/prisma';
+import { Prisma } from '../../generated/prisma/client';
 import { slugify } from '../../utils/slugify';
 import { CreateAmenityInputType } from './amenity.type';
 

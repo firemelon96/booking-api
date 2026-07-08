@@ -9,6 +9,10 @@ generator client {
   output   = "../src/generated/prisma"
 }
 
+generator erd {
+  provider = "prisma-erd-generator"
+}
+
 datasource db {
   provider = "postgresql"
 }
@@ -34,11 +38,12 @@ model User {
   bookings Booking[]
   reviews  Review[]
 
-  likedTours  TourLike[]
+  likedService  ServiceLike[]
 
   accommodations  Accommodation[]
-
-  accommodationBookings AccommodationBooking[]
+  tours Tour[]
+  transfers Transfer[]
+  rentals Rental[]
 
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
@@ -93,6 +98,7 @@ enum AdminAction {
   FORCED_PRIVATE
   BOOKED_ON_CLOSED_DATE
   FORCED_JOINER
+  EXCEED_CAPACITY
 }
 
 model AdminWarningLog{
@@ -101,7 +107,11 @@ model AdminWarningLog{
   actionType  AdminAction
   message   String
 
-  tourId    String
+  accommodationId String?
+  unitId   String?
+  tourId    String?
+  transferId  String?
+  rentalId String?
   bookingId String?
 
   actorId String
@@ -120,45 +130,101 @@ model Tour {
   slug           String @unique
   joinerCapacity Int    @default(12)
 
-  description  String
+  ownerId String
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  description  String?
   highlights   String[]
-  inclusions   String[]
-  exclusions   String[]
   location     String
   durationDays Int? //For day tours, this will be 1 day. For package tours, this will be the total duration of the tour in days.
   capacityMode CapacityMode @default(MIXED)
   type         TourType     @default(DAY)
   timezone     String       @default("Asia/Manila")
 
+  hasSchedule Boolean @default(false) //type day
+
   schedules          TourScheduleOption[] //For package tours, this will be empty and the schedule will be determined by the itinerary.
+
   itinerary          Itinerary?
+  cancellationPolicy CancellationPolicy?
+
+  inclusions         TourInclusion[]
+  exclusions         TourExclusion[]
   images             Image[]
   pricing            TourPricing[]
   reviews            Review[]
   availability       TourAvailability[]
-  cancellationPolicy CancellationPolicy?
   capacity           TourDailyCapacity[]
   
-  bookings           Booking[]
+  tourBookings       TourBooking[]
 
-  likes             TourLike[]
+  likes              ServiceLike[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-model TourLike {
+model TourInclusion {
+  id   String @id @default(uuid())
+
+  title String
+  description String?
+
+  sortOrder Int @default(0)
+
+  tourId String
+  tour Tour @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tourId])
+}
+
+model TourExclusion {
+  id   String @id @default(uuid())
+
+  title String
+  description String?
+
+  sortOrder Int @default(0)
+
+  tourId String
+  tour Tour @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tourId])
+}
+
+model  ServiceLike {
   id  String @id @default(uuid())
 
+  serviceType ServiceType
+
   userId  String
-  tourId  String
 
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tour  Tour  @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
+  tourId  String?
+  tour  Tour?  @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
+  transferId String?
+  transfer Transfer? @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+  accommodationId String?
+  accommodation Accommodation? @relation(fields: [accommodationId], references: [id], onDelete: Cascade)
+
+  unitId String
+  unit AccommodationUnit? @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  rentalItemId String?
+  item RentalItem? @relation(fields: [rentalItemId] , references: [id], onDelete: Cascade)
 
   createdAt   DateTime @default(now())
 
-  @@unique([userId, tourId])
+  @@unique([userId, serviceType])
 }
 
 //================================
@@ -185,8 +251,8 @@ model TourDailyCapacity {
   id String @id @default(uuid())
 
   date     DateTime
-  capacity Int
-  booked   Int      @default(0) // current used slots
+  capacitySlots Int
+  bookedSlots   Int      @default(0) // current used slots
 
   scheduleId String?
   schedule   TourScheduleOption? @relation(fields: [scheduleId], references: [id])
@@ -215,10 +281,10 @@ model TourScheduleOption {
   startTIme String?
   endTime   String?
 
-  capacity Int?
+  maxParticipants Int?
 
-  schedules TourDailyCapacity[]
-  bookings  Booking[]
+  capacities TourDailyCapacity[]
+  tourBookings TourBooking[]
 
   createdAt DateTime @default(now())
 }
@@ -279,10 +345,28 @@ model Image {
   status ImageStatus @default(TEMP) //for cleanup
 
   tourId String?
+  tour      Tour?    @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
+  transferId  String?
+  transfer Transfer? @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+  rentalId String?
+  rental Rental? @relation(fields: [rentalId], references: [id], onDelete: Cascade)
+
+  rentalItemId String?
+  item RentalItem? @relation(fields: [rentalItemId], references: [id], onDelete: Cascade)
+
+  accommodationId String?
+  accommodation Accommodation? @relation(fields: [accommodationId], references: [id], onDelete: Cascade)
+
+  unitId  String?
+  unit AccommodationUnit? @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  reviewId String?
+  review Review? @relation(fields: [reviewId], references: [id], onDelete: Cascade)
 
   userProfile User? @relation("UserProfileImage")
 
-  tour      Tour?    @relation(fields: [tourId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 }
 
@@ -322,49 +406,79 @@ model CancellationPolicy {
   updatedAt DateTime @updatedAt
 }
 
-//================================
-// BOOKING TABLES
-//================================
 model Booking {
-  id String @id @default(uuid())
+  id  String  @id @default(uuid())
 
-  userId String
-  tourId String
+  reference String @unique
+  type ServiceType
 
-  pricingType  PricingType
-  participants Int
-  notes        String?
+  userId  String
+  user  User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  totalPrice Float?
-  status     BookingStatus @default(PENDING)
+  bookingStatus BookingStatus @default(PENDING)
+  paymentStatus PaymentStatus @default(PENDING)
 
-  isOverbooked Boolean @default(false)
+  totalPrice  Decimal @db.Decimal(12,2)
+
+  paidAmount  Decimal @db.Decimal(12,2) @default(0)
+
+  remainingBalance  Decimal @db.Decimal(12,2) @default(0)
+
+  expiresAt DateTime?
+
+  cancelledAt DateTime?
+  cancellationReason  String?
+
   isAdminOverride Boolean @default(false)
-
-  startDate DateTime
-  endDate   DateTime?
 
   rescheduleCount    Int       @default(0)
   lastRescheduleDate DateTime?
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   cancellationRefundType CancellationRefundType?
   cancellationRefundPercentage  Int?
-  canceledAt         DateTime?
-
-  expiresAt DateTime?
-
-  refundAmount Float?
+  refundAmount Decimal? @db.Decimal(12,2)
   refundStatus RefundStatus?
 
-  scheduleId String? //For package tours, this will be null and the schedule will be determined by the itinerary.
+  tourBooking TourBooking?
 
-  payment Payment?
+  accommodationBooking AccommodationBooking?
 
-  user     User                @relation(fields: [userId], references: [id], onDelete: Restrict)
-  tour     Tour                @relation(fields: [tourId], references: [id], onDelete: Restrict)
-  schedule TourScheduleOption? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  transferBooking TransferBooking?
 
-  logs BookingAuditLog[]
+  rentalBooking RentalBooking?
+
+  payment PaymentTransation[]
+
+  auditLog  BookingAuditLog[]
+}
+
+//================================
+// BOOKING TABLES
+//================================
+model TourBooking {
+  id String @id @default(uuid())
+
+  bookingId String @unique
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  tourId String
+  tour     Tour  @relation(fields: [tourId], references: [id])
+
+  pricingType  PricingType
+  participants Int
+
+  startDate DateTime
+  endDate   DateTime?
+
+  notes        String?
+
+  scheduleId String?
+  schedule TourScheduleOption? @relation(fields: [scheduleId], references: [id]) 
+  
+  isOverbooked Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -377,8 +491,11 @@ model Booking {
 //================================
 model BookingAuditLog {
   id            String        @id @default(uuid())
+
   bookingId     String
-  actorId       String //userid
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  
+  actorId       String? //userid
   actorType     Role //USER or ADMIN
   action        BookingAction //e.g. CREATED, RESCHEDULED, CANCELLED
   previousValue Json? //e.g. previous start date for rescheduling, or previous status for cancellation
@@ -389,22 +506,38 @@ model BookingAuditLog {
 
   createdAt DateTime @default(now())
 
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 }
 
 //================================
 // PAYMENT TABLES
 //================================
-model Payment {
+model PaymentTransation {
   id              String        @id @default(uuid())
   bookingId       String        @unique
-  accommodationId String        @unique
-  xenditInvoiceId String
-  invoiceUrl      String
-  status          PaymentStatus @default(PENDING)
-
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  accommodationBooking  AccommodationBooking @relation(fields: [accommodationId], references: [id], onDelete: Cascade)
+
+  type TransactionType
+
+  amount Decimal @db.Decimal(12,2)
+
+  paidAt  DateTime?
+  description String?
+  expiresAt DateTime?
+
+  xenditInvoiceId String?
+  invoiceUrl      String?
+
+  metadata  Json?
+
+  paymentStatus          PaymentStatus @default(PENDING)
+
+}
+
+enum TransactionType {
+  INITIAL_PAYMENT
+  ADDITIONAL_PAYMENT
+  REFUND
+  MANUAL_ADJUSTMENT
 }
 
 //================================
@@ -414,13 +547,23 @@ model Review {
   id         String @id @default(uuid())
   starRating Int
   comment    String
-  // imageIds    String[]
+  imageIds    String[]
 
   userId String
-  tourId String
+  tourId String?
+  transferId String?
+  accommodationId String?
+  unitId String?
+  rentalItemId String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tour Tour @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  tour Tour? @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  transfer Transfer? @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  accommodation Accommodation? @relation(fields: [accommodationId], references: [id], onDelete: Cascade)
+  unit AccommodationUnit? @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  rentalItem RentalItem? @relation(fields: [rentalItemId], references: [id], onDelete: Cascade)
+
+  images Image[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -462,13 +605,17 @@ model Accommodation {
 
   units AccommodationUnit[]
 
-  images AccommodationImage[]
+  images Image[]
 
   amenities AccommodationAmenity[]
 
   bookings  AccommodationBooking[]
 
   inventory AccommodationInventory[]
+
+  likes ServiceLike[]
+
+  reviews Review[]
 
   cancellationPolicy  AccommodationCancellationPolicy?
 
@@ -505,7 +652,11 @@ model AccommodationUnit {
 
   amenities  AccommodationUnitAmenity[]
 
-  images AccommodationUnitImage[]
+  images Image[]
+
+  reviews Review[]
+
+  likes ServiceLike[]
 
   @@unique([accommodationId, slug])
 }
@@ -522,37 +673,11 @@ model Amenity {
 
   accommodations  AccommodationAmenity[]
 
+  rentals RentalAmenity[]
+
+  transfers TransferAmenity[]
+
   units AccommodationUnitAmenity[]
-}
-
-model AccommodationImage {
-  id String @id @default(uuid())
-
-  accommodationId String
-  accommodation Accommodation @relation(fields: [accommodationId], references: [id], onDelete: Cascade)
-
-  url String
-
-  isFeatured Boolean @default(false)
-
-  sortOrder Int @default(0)
-
-  createdAt DateTime @default(now())
-}
-
-model AccommodationUnitImage {
-  id String @id @default(uuid())
-
-  unitId String
-  unit AccommodationUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
-
-  url String
-
-  isFeatured Boolean @default(false)
-
-  sortOrder Int @default(0)
-
-  createdAt DateTime @default(now())
 }
 
 model AccommodationAmenity {
@@ -614,35 +739,27 @@ model AccommodationUnitInventory{
 model AccommodationBooking {
   id  String  @id @default(uuid())
 
+  bookingId String @unique
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
   accommodationId String
   accommodation Accommodation @relation(fields: [accommodationId], references: [id])
 
   unitId  String?
   unit  AccommodationUnit? @relation(fields: [unitId], references: [id])
 
-  userId  String
-  user  User  @relation(fields: [userId], references: [id])
-
   checkIn DateTime
   checkOut  DateTime
 
   nights  Int
 
-  adults Int
-  children Int @default(0)
+  guests Int
 
-  units Int @default(1)
-
-  totalPrice Decimal @db.Decimal(10,2)
-
-  bookingStatus BookingStatus @default(PENDING)
-  paymentStatus PaymentStatus @default(PENDING)
-
-  expiresAt DateTime
+  units Int 
 
   specialRequests String?
 
-  payment Payment?
+  isOverbooked Boolean @default(false)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -665,9 +782,324 @@ model AccommodationCancellationPolicy{
   updatedAt DateTime  @updatedAt
 }
 
-enum BookingType {
+model Transfer {
+  id  String @id @default(uuid())
+  name  String
+  slug  String @unique
+
+  description String?
+  type TransferType
+
+  pricingMode TransferPricingMode
+
+  originId  String
+  origin TransferLocation @relation("TransferOrigin", fields: [originId], references: [id])
+  destinationId String
+  destination TransferLocation @relation("TransferDestination", fields: [destinationId], references: [id])
+  
+  hasSchedule Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt  
+
+  ownerId String
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  schedules TransferSchedule[]
+
+  inventories TransferInventory[]
+
+  pricing TransferPricing[]
+
+  amenities TransferAmenity[]
+
+  bookings TransferBooking[]
+
+  likes ServiceLike[]
+
+  reviews Review[]
+
+  images Image[]
+}
+
+model TransferAmenity {
+  transferId String
+  transfer  Transfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+  amenityId String
+  amenity Amenity @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+
+  @@id([transferId, amenityId])
+}
+
+model TransferLocation {
+  id  String @id @default(uuid())
+
+  name  String
+
+  type TransferLocationType
+
+  address String?
+
+  latitude Decimal?
+  longitude Decimal?
+
+  createdAt DateTime @default(now())
+
+  originTransfers Transfer[] @relation("TransferOrigin")
+
+  destinationTransfers Transfer[] @relation("TransferDestination")
+}
+
+model TransferSchedule {
+  id  String @id @default(uuid())
+
+  transferId  String
+  transfer Transfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+  departureTime String
+
+  maxPassengers Int
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  inventories TransferInventory[]
+
+  transferBookings TransferBooking[]
+}
+
+model TransferInventory {
+  id  String @id @default(uuid())
+
+  transferId String
+  transfer Transfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+  scheduleId String?
+  schedule TransferSchedule? @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  date  DateTime
+
+  availableSeats  Int
+  bookedSeats Int @default(0)
+
+  isClosed Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@unique([transferId, scheduleId, date])
+}
+
+model TransferPricing {
+  id String @id @default(uuid())
+
+  transferId  String
+  transfer Transfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+  pricingType PricingType
+
+  price Decimal @db.Decimal(12,2)
+
+  minPassengers Int
+  maxPassengers Int
+
+  createdAt DateTime @default(now())
+}
+
+model TransferBooking {
+  id  String @default(uuid())
+
+  bookingId String @unique
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  transferId String
+  transfer Transfer @relation(fields: [transferId], references: [id])
+
+  scheduleId String?
+  schedule TransferSchedule? @relation(fields: [scheduleId], references: [id])
+
+  date  DateTime
+
+  passengers Int
+
+  pricingType PricingType
+
+  pickupLocation  String?
+  dropoffLocation String?
+
+  createdAt DateTime @default(now())
+}
+
+enum TransferType {
+  AIRPORT
+  VAN
+  BOAT
+  FERRY
+  PRIVATE_CAR
+}
+
+enum TransferPricingMode {
+  SHARED
+  EXCLUSIVE
+}
+
+enum TransferLocationType {
+  AIRPORT
+  PORT
+  TERMINAL
+  HOTEL
+  CUSTOM
+}
+
+model Rental {
+  id String @id @default(uuid())
+
+  ownerId String
+  owner User @relation(fields: [ownerId], references: [id])
+
+  name String
+  slug String @unique
+
+  description String?
+
+  type RentalType
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  rentalItems RentalItem[]
+
+  amenities RentalAmenity[]
+
+  images Image[]
+}
+
+model RentalItem {
+  id String @id @default(uuid())
+
+  rentalId String
+  rental Rental @relation(fields: [rentalId], references: [id], onDelete: Cascade)
+
+  name String
+  description String?
+
+  itemCode String
+
+  quantity Int @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  inventories RentalInventory[]
+
+  pricing RentalPricing[]
+
+  bookings RentalBooking[]
+
+  likes ServiceLike[]
+
+  reviews Review[]
+
+  images Image[]
+
+  @@unique([rentalId, itemCode])
+  @@index([rentalId])
+}
+
+model RentalInventory {
+  id String @id @default(uuid())
+
+  rentalItemId String
+  rentalItem RentalItem @relation(fields: [rentalItemId], references: [id], onDelete: Cascade)
+
+  date DateTime
+
+  availableUnits Int
+
+  bookedUnits Int @default(0)
+
+  isClosed Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@unique([rentalItemId, date])
+}
+
+model RentalPricing {
+  id String @id @default(uuid())
+
+  rentalItemId String
+  rentalItem RentalItem @relation(fields: [rentalItemId], references: [id], onDelete: Cascade)
+
+  pricingType RentalPricingType
+
+  price Decimal @db.Decimal(12,2)
+
+  createdAt DateTime @default(now())
+}
+
+model RentalBooking {
+  id String @id  @default(uuid())
+
+  bookingId String @unique
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete:  Cascade)
+
+  rentalItemId String
+  item RentalItem @relation(fields: [rentalItemId], references: [id])
+
+  startDate DateTime
+  endDate DateTime
+
+  quantity Int
+
+  pricingType RentalPricingType
+
+  pickupLocation String?
+  returnLocation String?
+
+  hasOverbooking Boolean @default(false)
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RentalAmenity {
+  rentalId String
+  amenityId String
+
+  rental Rental @relation(fields: [rentalId], references: [id], onDelete:  Cascade)
+
+  amenity Amenity @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+
+  @@id([rentalId, amenityId])
+}
+
+enum RentalType {
+  MORTORBIKE
+  SCOOTER
+  CAR
+  VAN
+  BICYCLE
+  KAYAK
+  CAMPING_GEAR
+  BOAT
+  OTHER
+}
+
+enum RentalPricingType {
+  HOURLY
+  DAILY
+  WEEKLY
+}
+
+enum ServiceType {
   TOUR
   ACCOMMODATION
+  TRANSFER
+  RENTAL
 }
 
 enum AccommodationType {
@@ -692,12 +1124,7 @@ enum BookingAction {
   CREATED
   RESCHEDULED
   CANCELLED
-}
-
-enum BedType {
-  DOUBLE
-  KING
-  QUEEN
+  PAYMENT_WEBHOOK_UPDATED
 }
 
 enum TourType {
@@ -731,12 +1158,19 @@ enum PricingModel {
 enum Role {
   USER
   ADMIN
+  SYSTEM
 }
 
 enum ImageType {
   TOUR
   ITINERARY
+  TRANSFER
+  ACCOMMODATION
+  ACCOMMODATIONUNIT
+  RENTALITEMS
+  RENTAL
   PROFILE
+  REVIEW
 }
 
 enum ImageStatus {
@@ -763,6 +1197,8 @@ enum PaymentStatus {
   PAID
   EXPIRED
   FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
 }
 
 enum CancellationRefundType {

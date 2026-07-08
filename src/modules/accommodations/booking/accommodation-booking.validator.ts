@@ -2,9 +2,7 @@ import z from 'zod';
 
 export const createAccommodationBookingSchema = z
   .object({
-    accommodationId: z.uuid(),
     unitId: z.uuid().optional(),
-    userId: z.uuid(),
     checkIn: z.coerce.date(),
     checkOut: z.coerce.date(),
     adults: z.number(),
@@ -16,3 +14,12 @@ export const createAccommodationBookingSchema = z
     message: 'Check out must be after check in',
     path: ['checkOut'],
   });
+
+export const rescheduleAccommodationBookingSchema = z.object({
+  checkIn: z.coerce.date(),
+  checkOut: z.coerce.date(),
+});
+
+export const accommodationIdParams = z.object({
+  accommodationId: z.uuid(),
+});

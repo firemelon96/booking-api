@@ -10,6 +10,7 @@ import { CreateTourType, TourParams, UpdateTourType } from './tour.type';
 import { attachImages } from './images/images.service';
 import { validateItineraryRules } from './itinerary/itinerary.rule';
 import { validatePricingRules } from './pricing/pricing.rule';
+import { TourWhereInput } from '../../generated/prisma/models';
 
 export async function listTours({
   page = 1,
@@ -30,34 +31,33 @@ export async function listTours({
     [sortField || 'createdAt']: sortOrder === 'asc' ? 'asc' : 'desc',
   };
 
-  const where: any = {};
-
-  if (capacityMode) where.capacityMode = capacityMode;
-  if (duration) where.duration = duration;
-  if (type) where.type = type;
-
-  if (search) {
-    where.OR = [
-      {
-        name: {
-          contains: search,
-          mode: 'insensitive',
+  const where: TourWhereInput = {
+    ...(capacityMode && { capacityMode }),
+    ...(duration && { durationDays: duration }),
+    ...(type && { type }),
+    ...(search && {
+      OR: [
+        {
+          name: {
+            contains: search,
+            mode: 'insensitive',
+          },
         },
-      },
-      {
-        location: {
-          contains: search,
-          mode: 'insensitive',
+        {
+          location: {
+            contains: search,
+            mode: 'insensitive',
+          },
         },
-      },
-      {
-        slug: {
-          contains: search,
-          mode: 'insensitive',
+        {
+          slug: {
+            contains: search,
+            mode: 'insensitive',
+          },
         },
-      },
-    ];
-  }
+      ],
+    }),
+  };
 
   const [data, total] = await prisma.$transaction([
     prisma.tour.findMany({
@@ -75,6 +75,46 @@ export async function listTours({
           select: {
             price: true,
             pricingModel: true,
+            maxGroupSize: true,
+            minGroupSize: true,
+            pricingType: true,
+          },
+        },
+        schedules: {
+          select: {
+            id: true,
+            label: true,
+            startTIme: true,
+            endTime: true,
+          },
+        },
+        exclusions: {
+          select: {
+            title: true,
+            description: true,
+          },
+        },
+        inclusions: {
+          select: {
+            title: true,
+            description: true,
+          },
+        },
+        itinerary: {
+          select: {
+            days: {
+              select: {
+                dayNumber: true,
+                title: true,
+                items: true,
+              },
+            },
+          },
+        },
+        images: {
+          select: {
+            isFeatured: true,
+            publicId: true,
           },
         },
       },
@@ -91,7 +131,37 @@ export async function listTours({
       duration: t.durationDays,
       mode: t.capacityMode,
       tourType: t.type,
-      startsAt: `${t.pricing[0].price} ${t.pricing[0].pricingModel}`,
+      pricing: t.pricing.map((p) => ({
+        price: p.price,
+        mode: p.pricingModel,
+        type: p.pricingType,
+        min: p.minGroupSize,
+        max: p.maxGroupSize,
+      })),
+      schedules: t.schedules.map((s) => ({
+        id: s.id,
+        start: s.startTIme,
+        end: s.endTime,
+        label: s.label,
+      })),
+      inclusions: t.inclusions.map((i) => ({
+        title: i.title,
+        description: i.description,
+      })),
+      exclusions: t.exclusions.map((e) => ({
+        title: e.title,
+        description: e.description,
+      })),
+      itinerary: t.itinerary?.days.map((d) => ({
+        day: d.dayNumber,
+        title: d.title,
+        items: d.items.map((i) => ({
+          title: i.title,
+          time: i.time,
+          description: i.description,
+          order: i.order,
+        })),
+      })),
       numberOfLikes: t._count,
     })),
     meta: {
@@ -108,7 +178,66 @@ export async function getTourBySlug(slug: string) {
     where: {
       slug,
     },
-    include: { pricing: true, itinerary: { include: { days: true } } },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      slug: true,
+      capacityMode: true,
+      durationDays: true,
+      type: true,
+      timezone: true,
+      location: true,
+      itinerary: {
+        select: {
+          days: {
+            select: {
+              dayNumber: true,
+              title: true,
+              items: {
+                select: {
+                  title: true,
+                  time: true,
+                  description: true,
+                  order: true,
+                },
+              },
+            },
+          },
+        },
+      },
+      inclusions: {
+        select: {
+          title: true,
+          description: true,
+          sortOrder: true,
+        },
+      },
+      exclusions: {
+        select: {
+          title: true,
+          description: true,
+          sortOrder: true,
+        },
+      },
+      schedules: {
+        select: {
+          label: true,
+          startTIme: true,
+          endTime: true,
+          capacity: true,
+        },
+      },
+      pricing: {
+        select: {
+          pricingType: true,
+          pricingModel: true,
+          minGroupSize: true,
+          maxGroupSize: true,
+          price: true,
+        },
+      },
+    },
   });
 
   if (!tour) throw new Error('Tour slug not found');
@@ -116,7 +245,12 @@ export async function getTourBySlug(slug: string) {
   return tour;
 }
 
-export async function createFullTour(data: CreateTourType) {
+export async function createFullTour({
+  inclusions,
+  exclusions,
+  schedules,
+  ...data
+}: CreateTourType) {
   validateItineraryRules(data.type, data.itinerary, data.durationDays!);
   validatePricingRules(data.capacityMode, data.pricing);
 
@@ -124,22 +258,57 @@ export async function createFullTour(data: CreateTourType) {
 
   await existingTourSlug(slug);
 
+  if (data.hasSchedule && !schedules.length) {
+    throw new Error('Schedules is required');
+  }
+
+  if (!data.hasSchedule && schedules.length > 0) {
+    throw new Error('Schedule is not required');
+  }
+
   return prisma.$transaction(async (tx) => {
     //create tour
     const tour = await tx.tour.create({
       data: {
+        ownerId: data.ownerId,
         slug,
         description: data.description,
         location: data.location,
         name: data.name,
         durationDays: data.durationDays,
-        exclusions: data.exclusions,
-        inclusions: data.inclusions,
         capacityMode: data.capacityMode,
         type: data.type,
         joinerCapacity: data.joinerCapacity,
       },
     });
+
+    if (inclusions.length > 0) {
+      await tx.tourInclusion.createMany({
+        data: inclusions.map((item) => ({
+          ...item,
+          tourId: tour.id,
+        })),
+      });
+    }
+
+    if (exclusions.length > 0) {
+      await tx.tourExclusion.createMany({
+        data: exclusions.map((item) => ({
+          ...item,
+          tourId: tour.id,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    if (schedules.length > 0) {
+      await tx.tourScheduleOption.createMany({
+        data: schedules.map((schedule) => ({
+          tourId: tour.id,
+          ...schedule,
+        })),
+      });
+    }
 
     //create itineraries
     await createItinerary(tx, tour.id, data.itinerary);
@@ -152,8 +321,15 @@ export async function createFullTour(data: CreateTourType) {
   });
 }
 
-export async function updateBaseTour(id: string, data: UpdateTourType) {
+export async function updateBaseTour(
+  id: string,
+  { schedules, ...data }: UpdateTourType,
+) {
   const existing = await findTourOrFail(id);
+
+  if (existing.hasSchedule && !schedules?.length) {
+    throw new Error('Schedule is required');
+  }
 
   let slug = existing.slug;
 
@@ -173,13 +349,31 @@ export async function updateBaseTour(id: string, data: UpdateTourType) {
 
   validateBaseTourRules(baseValidationInput);
 
-  const updateData = Object.fromEntries(
-    Object.entries({ ...data, slug }).filter(
-      ([_, value]) => value !== undefined,
-    ),
-  );
+  return prisma.$transaction(async (tx) => {
+    const tour = await tx.tour.update({
+      where: { id },
+      data: {
+        ...data,
+        slug,
+      },
+    });
 
-  return prisma.tour.update({ where: { id }, data: updateData });
+    if (schedules && schedules.length > 0) {
+      await tx.tourScheduleOption.deleteMany({
+        where: { tourId: tour.id },
+      });
+
+      await tx.tourScheduleOption.createMany({
+        data: schedules.map((schedule) => ({
+          tourId: tour.id,
+          label: schedule.label,
+          startTime: schedule.startTime,
+          endTime: schedule.endTime,
+          capacity: schedule.maxParticipants,
+        })),
+      });
+    }
+  });
 }
 
 export async function deleteTour(id: string) {
@@ -191,5 +385,5 @@ export async function deleteTour(id: string) {
 
   await Promise.all(deletePromises);
 
-  return prisma.tour.delete({ where: { id } });
+  return prisma.tour.delete({ where: { id: existing.id } });
 }

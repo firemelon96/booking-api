@@ -196,7 +196,7 @@ export async function refreshSession(
     res.cookie('accessToken', accessToken, accessCookieOptions);
     res.cookie('refreshToken', newRefreshToken, refreshCookieOptions);
 
-    return res.json({ success: true });
+    return res.json({ success: true, session });
   } catch (error) {
     next(error);
   }

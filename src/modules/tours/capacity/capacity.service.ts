@@ -2,7 +2,11 @@ import { eachDayOfInterval, startOfDay } from 'date-fns';
 import { prisma } from '../../../config/prisma';
 import { BulkCapacityParams, CapacityParams } from './capacity.type';
 import { normalizeInterval } from '../../../utils/helper';
-import { findCapacityOrFail, lockCapacityRows } from './capacity.query';
+import {
+  findCapacityOrFail,
+  lockCapacityRows,
+  prepareCapacity,
+} from './capacity.query';
 
 // export async function upsertCapacity({
 //   tourId,
@@ -44,7 +48,6 @@ export async function bulkSetCapacity({
   const interval = normalizeInterval(startDate, endDate);
 
   const dates = eachDayOfInterval(interval);
-  const scheduleKey = scheduleId ?? 'NO_SCHEDULE';
 
   if (capacity < 0) {
     throw new Error('Capacity cannot be negative');
@@ -52,43 +55,31 @@ export async function bulkSetCapacity({
 
   return prisma.$transaction(async (tx) => {
     //create missiong row
-    await tx.tourDailyCapacity.createMany({
-      data: dates.map((date) => ({
+    await prepareCapacity({ tx, tourId, scheduleId, capacity, dates });
+
+    const result = await tx.tourDailyCapacity.updateMany({
+      where: {
         tourId,
-        date: startOfDay(new Date(date)),
-        scheduleId: scheduleId ?? null,
-        scheduleKey,
-        capacity,
-        booked: 0,
-      })),
-      skipDuplicates: true,
+        scheduleId,
+        date: { gte: interval.start, lte: interval.end },
+        bookedSlots: {
+          lte: capacity,
+        },
+      },
+      data: {
+        availableSlots: capacity,
+      },
     });
 
-    const lockRows = await lockCapacityRows(tx, { tourId, dates, scheduleKey });
+    const expected = dates.length;
 
-    const invalidRows = lockRows.filter((row) => row.booked > capacity);
-
-    if (invalidRows.length > 0) {
+    if (result.count !== expected) {
       throw new Error('Cannot set capacity below booked count.');
     }
 
-    await tx.tourDailyCapacity.updateMany({
-      where: {
-        tourId,
-        date: {
-          gte: interval.start,
-          lte: interval.end,
-        },
-        scheduleKey,
-      },
-      data: {
-        capacity,
-      },
-    });
-
     return {
       success: true,
-      updatedDates: dates.length,
+      updatedDates: result.count,
       capacity,
     };
   });
@@ -108,7 +99,7 @@ export async function updateCapacity({
       id,
     },
     data: {
-      capacity,
+      bookedSlots: capacity,
     },
   });
 }
@@ -124,7 +115,7 @@ export async function deleteCapacity({ tourId }: { tourId: string }) {
     throw new Error('Capacity not found');
   }
 
-  if (row.booked > 0) {
+  if (row.bookedSlots > 0) {
     throw new Error('Cannot reset active booking');
   }
 
