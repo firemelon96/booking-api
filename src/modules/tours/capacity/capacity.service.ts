@@ -67,7 +67,7 @@ export async function bulkSetCapacity({
         },
       },
       data: {
-        availableSlots: capacity,
+        capacitySlots: capacity,
       },
     });
 

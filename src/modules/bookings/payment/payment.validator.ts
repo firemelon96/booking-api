@@ -1,6 +1,6 @@
 import { Types } from '@prisma/client/runtime/client';
 import z from 'zod';
-import { BookingType, TransactionType } from '../../../generated/prisma/enums';
+import { TransactionType } from '../../../generated/prisma/enums';
 
 export const createPaymentSchema = z.object({
   bookingId: z.string(),

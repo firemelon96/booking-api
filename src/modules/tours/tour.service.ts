@@ -225,7 +225,7 @@ export async function getTourBySlug(slug: string) {
           label: true,
           startTIme: true,
           endTime: true,
-          capacity: true,
+          maxParticipants: true,
         },
       },
       pricing: {
@@ -369,7 +369,7 @@ export async function updateBaseTour(
           label: schedule.label,
           startTime: schedule.startTime,
           endTime: schedule.endTime,
-          capacity: schedule.maxParticipants,
+          maxParticipants: schedule.maxParticipants,
         })),
       });
     }

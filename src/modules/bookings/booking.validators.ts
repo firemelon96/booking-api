@@ -1,7 +1,7 @@
 import z from 'zod';
 import {
   BookingStatus,
-  BookingType,
+  ServiceType,
   PaymentStatus,
   PricingType,
   Role,
@@ -17,7 +17,7 @@ export const bookingQuerySchema = z.object({
   sort: z.string().optional(),
   search: z.string().optional(),
   reference: z.string().optional(),
-  type: z.enum(BookingType).optional(),
+  type: z.enum(ServiceType).optional(),
   bookingStatus: z.enum(BookingStatus).optional(),
   paymentStatus: z.enum(PaymentStatus).optional(),
   totalPrice: z.number().optional(),

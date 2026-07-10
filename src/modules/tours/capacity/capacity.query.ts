@@ -1,14 +1,10 @@
-import { startOfDay } from 'date-fns';
 import { prisma } from '../../../config/prisma';
 import {
   CapacityMode,
   PricingType,
   Prisma,
-  Role,
   TourDailyCapacity,
 } from '../../../generated/prisma/client';
-import { CapacityCtx } from './capacity.type';
-import { detectOverbooking } from '../../bookings/booking.query';
 import { logAdminWarning } from '../../logs/admin-warning.service';
 import { getScheduleKey } from '../../../utils/helper';
 
@@ -45,7 +41,7 @@ export async function prepareCapacity({
       date,
       scheduleId,
       scheduleKey,
-      availableSlots: capacity,
+      capacitySlots: capacity,
       bookedSlots: 0,
     })),
     skipDuplicates: true,
@@ -301,7 +297,7 @@ async function reserveSharedTourCapacity(
   let hasAdminOverride = false;
 
   for (const row of rows) {
-    const remainingSlots = row.availableSlots - row.bookedSlots;
+    const remainingSlots = row.capacitySlots - row.bookedSlots;
 
     if (remainingSlots < participants) {
       if (!isAdmin) {
@@ -375,7 +371,7 @@ async function reserveExclusiveTourCapacity(
     await tx.tourDailyCapacity.update({
       where: { id: row.id },
       data: {
-        bookedSlots: { increment: row.availableSlots },
+        bookedSlots: { increment: row.capacitySlots },
       },
     });
   }
@@ -500,7 +496,7 @@ export async function releaseCapacity({
         bookedSlots: {
           decrement: participants,
         },
-        availableSlots: 0,
+        capacitySlots: 0,
       },
     });
   }

@@ -212,7 +212,7 @@ model  ServiceLike {
   accommodationId String?
   accommodation Accommodation? @relation(fields: [accommodationId], references: [id], onDelete: Cascade)
 
-  unitId String
+  unitId String?
   unit AccommodationUnit? @relation(fields: [unitId], references: [id], onDelete: Cascade)
 
   rentalItemId String?

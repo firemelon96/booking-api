@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_middleware_1 = require("../../../middlewares/auth.middleware");
+const role_middleware_1 = require("../../../middlewares/role.middleware");
+const availability_controller_1 = require("./availability.controller");
+const availability_controller_2 = require("./availability.controller");
+const router = (0, express_1.Router)({ mergeParams: true });
+router.post('/block', auth_middleware_1.authenticate, role_middleware_1.requireAdmin, availability_controller_1.blockDates);
+router.post('/unblock', auth_middleware_1.authenticate, role_middleware_1.requireAdmin, availability_controller_2.unblockDates);
+exports.default = router;

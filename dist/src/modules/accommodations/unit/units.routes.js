@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_middleware_1 = require("../../../middlewares/auth.middleware");
+const role_middleware_1 = require("../../../middlewares/role.middleware");
+const units_controller_1 = require("./units.controller");
+const router = (0, express_1.Router)({ mergeParams: true });
+router.post('/', auth_middleware_1.authenticate, role_middleware_1.requireAdmin, units_controller_1.createUnit);
+router.patch('/:unitId', auth_middleware_1.authenticate, role_middleware_1.requireAdmin, units_controller_1.updateUnit);
+router.get('/', auth_middleware_1.authenticate, role_middleware_1.requireAdmin, units_controller_1.getUnits);
+router.delete('/:unitId', auth_middleware_1.authenticate, role_middleware_1.requireAdmin, units_controller_1.removeUnit);
+exports.default = router;

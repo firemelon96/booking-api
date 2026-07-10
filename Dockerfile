@@ -1,18 +1,6 @@
-# Build stage
-FROM node:20-alpine AS builder
-
-WORKDIR /app
-
-COPY package*.json ./
-RUN npm install
-
-COPY . .
-
-RUN npm run build
-
 
 # Runtime stage
-FROM node:20-alpine
+FROM node:20-alpine AS runner
 
 WORKDIR /app
 
@@ -22,10 +10,10 @@ ENV TZ=UTC
 COPY package*.json ./
 RUN npm install --omit=dev
 
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+COPY dist ./dist
+COPY public ./public
+COPY prisma ./prisma
+COPY prisma.config.ts ./prisma.config.ts
 
 EXPOSE 4000
 
