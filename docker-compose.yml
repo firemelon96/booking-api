@@ -1,9 +1,9 @@
 services:
   api:
     build: .
-    container_name: booking-api
+    container_name: booking-api-v2
     ports:
-      - '4001:4000'
+      - '4001:4001'
     env_file:
       - .env.production
     restart: unless-stopped
