@@ -23,7 +23,22 @@ const app = express();
 
 app.set('trust proxy', 1);
 
-app.use(cors());
+const allowedOrigins = ['http://localhost:3000'];
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // Allow requests without an Origin (e.g. Postman)
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+  }),
+);
+
 app.use(express.json());
 app.use(cookieParser());
 
