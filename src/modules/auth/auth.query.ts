@@ -5,6 +5,11 @@ import {
   verifyGoogleToken,
 } from '../../config/oauth';
 import { prisma } from '../../config/prisma';
+import {
+  BadRequestError,
+  NotFoundError,
+  UnauthorizedError,
+} from '../../errors';
 
 export async function oauthVerifier({
   provider,
@@ -21,17 +26,19 @@ export async function oauthVerifier({
   if (provider === 'apple') return verifyAppleToken(token);
   if (provider === 'github') return verifyGithubToken(token);
 
-  throw new Error('Invalid provider');
+  throw new BadRequestError('Invalid provider');
 }
 
 export async function checkVerifiedUserEmail(email: string) {
   const user = await prisma.user.findUnique({ where: { email } });
 
   if (!user) {
-    throw new Error('User not found');
+    throw new NotFoundError('User not found');
   }
 
-  if (!user.emailVerified) throw new Error('Please verify your email first');
+  if (!user.emailVerified) {
+    throw new UnauthorizedError('Please verify your email first');
+  }
 
   return user;
 }

@@ -1,5 +1,8 @@
+// middleware/errorHandler.ts
+
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
+import { AppError } from '../errors/app-error';
 
 export function errorHandler(
   err: unknown,
@@ -14,15 +17,17 @@ export function errorHandler(
     });
   }
 
-  if (err instanceof Error) {
-    return res.status(500).json({
-      type: 'INTERNAL_ERROR',
+  if (err instanceof AppError) {
+    return res.status(err.statusCode).json({
+      type: err.type,
       message: err.message,
     });
   }
 
+  console.error(err);
+
   return res.status(500).json({
-    type: 'UNKNOWN_ERROR',
+    type: 'INTERNAL_ERROR',
     message: 'Something went wrong',
   });
 }

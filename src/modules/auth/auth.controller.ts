@@ -10,6 +10,7 @@ import {
   verifyEmailSchema,
 } from './auth.validator';
 import * as SessionService from '../auth/session/session.service';
+import { BadRequestError, UnauthorizedError } from '../../errors';
 
 export async function oauth(req: Request, res: Response, next: NextFunction) {
   const { provider, token } = req.body;
@@ -44,7 +45,7 @@ export async function login(req: Request, res: Response, next: NextFunction) {
   const payload = loginSchema.safeParse(req.body);
 
   if (!payload.success) {
-    throw new Error('Invalid fields');
+    throw new UnauthorizedError('Invalid fields');
   }
 
   try {
@@ -76,7 +77,7 @@ export async function register(
   const payload = registerSchema.safeParse(req.body);
 
   if (!payload.success) {
-    throw new Error('Invalid fields');
+    throw new BadRequestError('Invalid fields');
   }
 
   try {
@@ -96,7 +97,7 @@ export async function verifyEmail(
   const payload = verifyEmailSchema.safeParse(req.query);
 
   if (!payload.success) {
-    throw new Error('Invalid fields');
+    throw new BadRequestError('Invalid fields');
   }
 
   try {
@@ -115,7 +116,7 @@ export async function resendVerification(
   const payload = sendEmailSchema.safeParse(req.body);
 
   if (!payload.success) {
-    throw new Error('Invalid fields');
+    throw new BadRequestError('Invalid fields');
   }
 
   try {
@@ -134,7 +135,7 @@ export async function logout(req: Request, res: Response, next: NextFunction) {
   const { refreshToken } = req.cookies;
 
   if (!refreshToken) {
-    throw new Error('Unauthorized');
+    throw new UnauthorizedError('Unauthorized');
   }
 
   try {
@@ -176,7 +177,7 @@ export async function refreshSession(
   const { refreshToken } = req.cookies;
 
   if (!refreshToken) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    throw new UnauthorizedError('Unauthorized');
   }
 
   try {
@@ -210,7 +211,7 @@ export async function forgotPassword(
   const payload = sendEmailSchema.safeParse(req.body);
 
   if (!payload.success) {
-    throw new Error('Invalid fields');
+    throw new BadRequestError('Invalid fields');
   }
 
   try {
@@ -230,7 +231,7 @@ export async function resetPassword(
   const payload = resetPasswordSchema.safeParse(req.body);
 
   if (!payload.success) {
-    throw new Error('Invalid fields');
+    throw new BadRequestError('Invalid fields');
   }
 
   try {

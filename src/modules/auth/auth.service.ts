@@ -15,6 +15,7 @@ import {
   sendResetPasswordEmail,
   sendVerificationEmail,
 } from './email/email.service';
+import { BadRequestError, UnauthorizedError } from '../../errors';
 
 export async function oauthLogin({
   email,
@@ -28,7 +29,7 @@ export async function oauthLogin({
   emailVerified: boolean;
 }) {
   if (!emailVerified) {
-    throw new Error('Oauth email not verified');
+    throw new UnauthorizedError('Oauth email not verified');
   }
 
   const existingAccount = await prisma.account.findUnique({
@@ -99,13 +100,13 @@ export async function login({ email, password }: LoginInputType) {
     //   where: { id: user.id },
     //   data: { password: hashedPassword },
     // });
-    throw new Error('Invalid credentials');
+    throw new UnauthorizedError('Invalid credentials');
   }
 
   const valid = await bcrypt.compare(password, user.password);
 
   if (!valid) {
-    throw new Error('Invalid credentials');
+    throw new UnauthorizedError('Invalid credentials');
   }
 
   const accessToken = signAccessToken({
@@ -151,7 +152,7 @@ export async function verifyEmail({ token }: VerifyEmailInput) {
   });
 
   if (!record || record.expiresAt < new Date()) {
-    throw new Error('Invalid or expired token');
+    throw new BadRequestError('Invalid or expired token');
   }
 
   await prisma.user.update({
@@ -222,7 +223,7 @@ export async function resetPassword({
   });
 
   if (!resetToken || resetToken.expiresAt < new Date()) {
-    throw new Error('Invalid or expired token');
+    throw new BadRequestError('Invalid or expired token');
   }
 
   const hashedPassword = await bcrypt.hash(newPassword, 10);
